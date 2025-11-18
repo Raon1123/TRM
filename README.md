@@ -23,6 +23,26 @@ Tiny Recursion Model (TRM) recursively improves its predicted answer y with a ti
 - Python 3.10 (or similar)
 - Cuda 12.6.0 (or similar)
 
+### Installation with uv
+
+This project uses uv for fast Python package management and includes predefined commands for dataset building and experiments.
+
+```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Sync dependencies
+uv sync
+
+# Install the package in editable mode
+uv pip install -e .
+
+# Login to Weights & Biases (optional)
+wandb login YOUR-LOGIN
+```
+
+Alternatively, using pip:
+
 ```bash
 pip install --upgrade pip wheel setuptools
 pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu126 # install torch based on your cuda version
@@ -33,33 +53,47 @@ wandb login YOUR-LOGIN # login if you want the logger to sync results to your We
 
 ### Dataset Preparation
 
+You can build datasets using the predefined uv commands or directly with Python.
+
 ```bash
-# ARC-AGI-1
+# Using uv run (recommended)
+uv run build-arc1
+uv run build-arc2
+uv run build-sudoku
+uv run build-maze
+
+# Or directly with Python
 python -m dataset.build_arc_dataset \
   --input-file-prefix kaggle/combined/arc-agi \
   --output-dir data/arc1concept-aug-1000 \
   --subsets training evaluation concept \
   --test-set-name evaluation
 
-# ARC-AGI-2
 python -m dataset.build_arc_dataset \
   --input-file-prefix kaggle/combined/arc-agi \
   --output-dir data/arc2concept-aug-1000 \
   --subsets training2 evaluation2 concept \
   --test-set-name evaluation2
 
-## Note: You cannot train on both ARC-AGI-1 and ARC-AGI-2 and evaluate them both because ARC-AGI-2 training data contains some ARC-AGI-1 eval data
+python dataset/build_sudoku_dataset.py --output-dir data/sudoku-extreme-1k-aug-1000  --subsample-size 1000 --num-aug 1000
 
-# Sudoku-Extreme
-python dataset/build_sudoku_dataset.py --output-dir data/sudoku-extreme-1k-aug-1000  --subsample-size 1000 --num-aug 1000  # 1000 examples, 1000 augments
-
-# Maze-Hard
-python dataset/build_maze_dataset.py # 1000 examples, 8 augments
+python dataset/build_maze_dataset.py
 ```
+
+## Note: You cannot train on both ARC-AGI-1 and ARC-AGI-2 and evaluate them both because ARC-AGI-2 training data contains some ARC-AGI-1 eval data
 
 ## Experiments
 
+You can run experiments using the predefined uv commands or directly with torchrun/python.
+
 ### ARC-AGI-1 (assuming 4 H-100 GPUs):
+
+```bash
+# Using uv run
+uv run pretrain-arc1
+```
+
+Or directly:
 
 ```bash
 run_name="pretrain_att_arc1concept_4"
@@ -69,12 +103,18 @@ data_paths="[data/arc1concept-aug-1000]" \
 arch.L_layers=2 \
 arch.H_cycles=3 arch.L_cycles=4 \
 +run_name=${run_name} ema=True
-
 ```
 
 *Runtime:* ~3 days
 
 ### ARC-AGI-2 (assuming 4 H-100 GPUs):
+
+```bash
+# Using uv run
+uv run pretrain-arc2
+```
+
+Or directly:
 
 ```bash
 run_name="pretrain_att_arc2concept_4"
@@ -84,12 +124,19 @@ data_paths="[data/arc2concept-aug-1000]" \
 arch.L_layers=2 \
 arch.H_cycles=3 arch.L_cycles=4 \
 +run_name=${run_name} ema=True
-
 ```
 
 *Runtime:* ~3 days
 
 ### Sudoku-Extreme (assuming 1 L40S GPU):
+
+```bash
+# Using uv run
+uv run pretrain-sudoku-mlp-t
+uv run pretrain-sudoku-att
+```
+
+Or directly:
 
 ```bash
 run_name="pretrain_mlp_t_sudoku"
@@ -119,6 +166,13 @@ arch.H_cycles=3 arch.L_cycles=6 \
 *Runtime:* < 36 hours
 
 ### Maze-Hard (assuming 4 L40S GPUs):
+
+```bash
+# Using uv run
+uv run pretrain-maze
+```
+
+Or directly:
 
 ```bash
 run_name="pretrain_att_maze30x30"

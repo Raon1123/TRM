@@ -1,0 +1,15 @@
+*.log
+
+# Virtual environments
+venv/
+.venv/
+
+# uv
+uv.lock
+
+# Datasets
+data/
+dataset/
+
+__pycache__/
+*.pyc

@@ -1,0 +1,9 @@
+
+# ignorance logging
+wnadb/
+__pycache__/
+*.pyc
+
+# ignorance uv
+.venv/
+uv.lock

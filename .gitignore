@@ -1,9 +1,10 @@
 
 # ignorance logging
-wnadb/
+wandb/
 __pycache__/
 *.pyc
 
 # ignorance uv
 .venv/
 uv.lock
+.python-version

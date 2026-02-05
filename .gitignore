@@ -1,10 +1,14 @@
+data/
+checkpoints/
 
 # ignorance logging
 wandb/
 __pycache__/
 *.pyc
+outputs/
 
 # ignorance uv
 .venv/
 uv.lock
 .python-version
+*.egg-info/

@@ -30,7 +30,7 @@ dependencies = [
 
 [[tool.uv.index]]
 name = "pytorch-cu126"
-url = "https://download.pytorch.org/whl/cu126"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
 [tool.uv.sources]
@@ -40,12 +40,3 @@ torch = [
 torchvision = [
   { index = "pytorch-cu126", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
-
-[build-system]
-requires = [
-    "torch>=2.7.0", 
-    "torchvision>=0.22.0"
-    ]
-
-[tool.setuptools.packages.find]
-exclude = ["config*", "assets*", "models*", "dataset*", "utils*"]

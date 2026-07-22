@@ -135,8 +135,15 @@ TFB_CYCLES=(1 6)
 # = 21 times, i.e. effective depth 42 at 6,828,034 params — byte-identical
 # param count to loop2x6/loop2x21 (verified by instantiation). So loop2x21 is
 # matched to fig1_tf_z_iter on BOTH parameters and effective depth, leaving
-# exactly three differences: z-carry, the 1-step gradient, and the injection
-# schedule — which tiers C and the trm_singlez cohort isolate one at a time.
+# FOUR differences: z-carry, the 1-step gradient, the injection schedule, and
+# puzzle_emb_len.
+# That last one is a trap: trm.yaml pins puzzle_emb_len=16 while ACTV2/ACTV3
+# use the ceil-div default of 1, so TRM runs on a 27-position sequence and the
+# lt_ grid on a 12-position one — and the PARAMETER COUNT IS IDENTICAL either
+# way (puzzle_emb is num_puzzle_identifiers x ndim), so a param check does not
+# surface it. The whole lt_ grid is held at the ceil-div default so the looped
+# and multi-layer arms share geometry; `lt_loop2x21_pel16` (tier C) is the one
+# cell that switches to 16, isolating this axis instead of confounding it.
 # NOTE (memory): loop2x21 is the heaviest cell — full BPTT retains ~42 layer
 # activations. If it OOMs, the first fallback is global_batch_size=1024 for
 # that cell ONLY, recorded as a protocol deviation.
@@ -165,6 +172,7 @@ LOOPED_TIER_B=(
 LOOPED_TIER_C=(
     "loop2x6_grad1|looped_transformer|arch.H_layers=2 arch.H_cycles=6 arch.loop_grad_cycles=1"
     "loop2x6_noinj|looped_transformer|arch.H_layers=2 arch.H_cycles=6 arch.input_injection_every_cycle=False"
+    "loop2x21_pel16|looped_transformer|arch.H_layers=2 arch.H_cycles=21 arch.puzzle_emb_len=16"
 )
 LOOPED_K_FULL=(3 4 5 6 7 8 10)   # tier A
 LOOPED_K_SUBSET=(4 6 8)          # tiers B, C

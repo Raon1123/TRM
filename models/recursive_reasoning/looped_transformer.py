@@ -97,6 +97,14 @@ class Model_ACTV3Config(BaseModel):
     # first iteration, so later iterations see the input solely through the
     # hidden state.
     input_injection_every_cycle: bool = True
+    # Number of sequence positions reserved for the puzzle embedding. 0 keeps
+    # the ceil-div convention of transformers_baseline (= 1 at hidden 512),
+    # which is what every cell of the looped-vs-multi-layer grid uses so the
+    # two arms share sequence geometry. trm.yaml instead pins 16, giving a
+    # 27-position sequence vs our 12 -- a difference the PARAMETER COUNT DOES
+    # NOT REVEAL (puzzle_emb is num_puzzle_identifiers x ndim either way). Set
+    # this to 16 to match TRM's geometry when comparing against fig1 runs.
+    puzzle_emb_len: int = 0
 
 
 class Model_ACTV3Block(nn.Module):
@@ -163,7 +171,12 @@ class Model_ACTV3_Inner(nn.Module):
         self.lm_head = CastedLinear(self.config.hidden_size, self.config.vocab_size, bias=False)
         self.q_head = CastedLinear(self.config.hidden_size, 2, bias=True)
 
-        self.puzzle_emb_len = -(self.config.puzzle_emb_ndim // -self.config.hidden_size)  # ceil div
+        # ceil div, unless pinned explicitly (see Model_ACTV3Config.puzzle_emb_len)
+        self.puzzle_emb_len = (
+            -(self.config.puzzle_emb_ndim // -self.config.hidden_size)
+            if self.config.puzzle_emb_len == 0
+            else self.config.puzzle_emb_len
+        )
         if self.config.puzzle_emb_ndim > 0:
             # Zero init puzzle embeddings
             self.puzzle_emb = CastedSparseEmbedding(

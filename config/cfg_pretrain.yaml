@@ -40,3 +40,37 @@ min_eval_interval: 0 # when to start the eval
 ema: False # use Exponential-Moving-Average
 ema_rate: 0.999 # EMA-rate
 freeze_weights: False # If True, freeze weights and only learn the embeddings
+
+# Opt-in only.  Set enabled=true *and* performance_only=true for a short
+# profiling run; traces deliberately live outside checkpoints/.
+perf_profiler:
+  enabled: false
+  performance_only: false
+  output_dir: performance_profiles
+  wait: 1
+  warmup: 1
+  active: 3
+  repeat: 1
+  max_steps: 64
+  record_shapes: false
+  profile_memory: true
+  with_stack: false
+  export_chrome_trace: true
+  export_tensorboard_trace: true
+
+# Opt-in only.  Set enabled=true *and* performance_only=true for a bounded
+# unprofiled timing run (M2); artifacts deliberately live outside checkpoints/.
+# Mutually exclusive with perf_profiler.enabled — profiler perturbation
+# invalidates M2 throughput.
+perf_benchmark:
+  enabled: false
+  performance_only: false
+  output_dir: performance_benchmarks
+  warmup_steps: 50
+  measured_steps: 200
+  eval_event_step: 2000
+  max_steps: 2000
+  condition_id: ""
+  repeat: 1
+  bootstrap_resamples: 10000
+  bootstrap_seed: 0

@@ -24,6 +24,8 @@ from utils.functions import load_model_class, get_model_source_path
 from models.sparse_embedding import CastedSparseEmbeddingSignSGD_Distributed
 from models.ema import EMAHelper
 from utils.z_logging import ZDynamicsLogger
+from utils.perf_profiler import PerfProfilerConfig, TrainingProfiler
+from utils.perf_benchmark import PerfBenchmarkConfig, TrainingBenchmark
 
 
 class LossConfig(pydantic.BaseModel):
@@ -93,6 +95,11 @@ class PretrainConfig(pydantic.BaseModel):
     z_snapshot: bool = True
     phase_threshold: float = 0.999
     phase_patience: int = 2
+
+    # The normal path constructs an inert profiler; see perf_profiler.py.
+    perf_profiler: PerfProfilerConfig = pydantic.Field(default_factory=PerfProfilerConfig)
+    # The normal path constructs an inert benchmark; see perf_benchmark.py.
+    perf_benchmark: PerfBenchmarkConfig = pydantic.Field(default_factory=PerfBenchmarkConfig)
 
 @dataclass
 class TrainState:
@@ -297,13 +304,18 @@ def create_evaluators(config: PretrainConfig, eval_metadata: PuzzleDatasetMetada
 
     return evaluators
 
-def train_batch(config: PretrainConfig, train_state: TrainState, batch: Any, global_batch_size: int, rank: int, world_size: int):
+def train_batch(config: PretrainConfig, train_state: TrainState, batch: Any, global_batch_size: int, rank: int, world_size: int, bench: TrainingBenchmark):
     train_state.step += 1
     if train_state.step > train_state.total_steps:  # At most train_total_steps
         return
 
+    # After the total_steps guard, so a skipped update never opens a row; before
+    # the H2D copy, so token counts are read off the CPU batch without touching CUDA.
+    bench.begin_update(batch, global_batch_size)
+
     # To device
-    batch = {k: v.cuda() for k, v in batch.items()}
+    with bench.cuda_span("h2d"):
+        batch = {k: v.cuda() for k, v in batch.items()}
 
     # Init carry if it is None
     if train_state.carry is None:
@@ -311,9 +323,10 @@ def train_batch(config: PretrainConfig, train_state: TrainState, batch: Any, glo
             train_state.carry = train_state.model.initial_carry(batch)  # type: ignore
 
     # Forward
-    train_state.carry, loss, metrics, _, _ = train_state.model(carry=train_state.carry, batch=batch, return_keys=[])
+    with bench.cuda_span("forward_backward"):
+        train_state.carry, loss, metrics, _, _ = train_state.model(carry=train_state.carry, batch=batch, return_keys=[])
 
-    ((1 / global_batch_size) * loss).backward()
+        ((1 / global_batch_size) * loss).backward()
 
     # Allreduce
     if world_size > 1:
@@ -322,15 +335,16 @@ def train_batch(config: PretrainConfig, train_state: TrainState, batch: Any, glo
                 dist.all_reduce(param.grad)
             
     # Apply optimizer
-    lr_this_step = None    
-    for optim, base_lr in zip(train_state.optimizers, train_state.optimizer_lrs):
-        lr_this_step = compute_lr(base_lr, config, train_state)
+    lr_this_step = None
+    with bench.cuda_span("optimizer"):
+        for optim, base_lr in zip(train_state.optimizers, train_state.optimizer_lrs):
+            lr_this_step = compute_lr(base_lr, config, train_state)
 
-        for param_group in optim.param_groups:
-            param_group['lr'] = lr_this_step
-            
-        optim.step()
-        optim.zero_grad()
+            for param_group in optim.param_groups:
+                param_group['lr'] = lr_this_step
+
+            optim.step()
+            optim.zero_grad()
 
     # Reduce metrics
     if len(metrics):
@@ -338,12 +352,14 @@ def train_batch(config: PretrainConfig, train_state: TrainState, batch: Any, glo
 
         metric_keys = list(sorted(metrics.keys()))  # Sort keys to guarantee all processes use the same order.
         # Reduce and reconstruct
-        metric_values = torch.stack([metrics[k] for k in metric_keys])
-        if world_size > 1:
-            dist.reduce(metric_values, dst=0)
+        with bench.cuda_span("metrics_device"):
+            metric_values = torch.stack([metrics[k] for k in metric_keys])
+            if world_size > 1:
+                dist.reduce(metric_values, dst=0)
 
         if rank == 0:
-            metric_values = metric_values.cpu().numpy()
+            with bench.wall_span("metrics_wandb"):
+                metric_values = metric_values.cpu().numpy()
             reduced_metrics = {k: metric_values[i] for i, k in enumerate(metric_keys)}
             
             # Postprocess
@@ -352,6 +368,98 @@ def train_batch(config: PretrainConfig, train_state: TrainState, batch: Any, glo
 
             reduced_metrics["train/lr"] = lr_this_step
             return reduced_metrics
+
+
+def train_batch_profiled(
+    config: PretrainConfig,
+    train_state: TrainState,
+    batch: Any,
+    global_batch_size: int,
+    rank: int,
+    world_size: int,
+    profiler: TrainingProfiler,
+):
+    """Profiled counterpart to ``train_batch``.
+
+    Kept separate so that attaching the CUPTI profiler -- whose `record_function`
+    ranges perturb the very timings M2 registers -- stays confined to this
+    function and never touches the default path.
+
+    The default ``train_batch`` is NO LONGER free of context managers around
+    model execution: it carries `bench.cuda_span(...)` / `bench.wall_span(...)`
+    brackets at h2d, forward+backward, optimizer and metrics.  Those are inert
+    when the benchmark is disabled -- each is one frozenset membership test, one
+    `None` check on the open row, and enter/exit of the shared module-level
+    `nullcontext` -- so the disabled hot path is unchanged in behaviour, but it
+    is not literally call-free.  This function's separation buys profiler
+    isolation, not context-manager absence.
+    """
+    train_state.step += 1
+    if train_state.step > train_state.total_steps:
+        return
+
+    with profiler.record("train/h2d"):
+        batch = {k: v.cuda() for k, v in batch.items()}
+
+    if train_state.carry is None:
+        with profiler.record("train/initial_carry"):
+            with torch.device("cuda"):
+                train_state.carry = train_state.model.initial_carry(batch)  # type: ignore
+
+    with profiler.record("train/forward_loss"):
+        train_state.carry, loss, metrics, _, _ = train_state.model(
+            carry=train_state.carry, batch=batch, return_keys=[]
+        )
+
+    with profiler.record("train/backward"):
+        ((1 / global_batch_size) * loss).backward()
+
+    if world_size > 1:
+        with profiler.record("train/allreduce"):
+            for param in train_state.model.parameters():
+                if param.grad is not None:
+                    dist.all_reduce(param.grad)
+
+    lr_this_step = None
+    with profiler.record("train/optimizer"):
+        for optim, base_lr in zip(train_state.optimizers, train_state.optimizer_lrs):
+            lr_this_step = compute_lr(base_lr, config, train_state)
+            for param_group in optim.param_groups:
+                param_group['lr'] = lr_this_step
+            optim.step()
+            optim.zero_grad()
+
+    if len(metrics):
+        assert not any(v.requires_grad for v in metrics.values())
+        metric_keys = list(sorted(metrics.keys()))
+        with profiler.record("train/metrics_reduce"):
+            metric_values = torch.stack([metrics[k] for k in metric_keys])
+            if world_size > 1:
+                dist.reduce(metric_values, dst=0)
+
+        if rank == 0:
+            with profiler.record("train/metrics_d2h"):
+                metric_values = metric_values.cpu().numpy()
+            reduced_metrics = {k: metric_values[i] for i, k in enumerate(metric_keys)}
+            count = max(reduced_metrics["count"], 1)
+            reduced_metrics = {
+                f"train/{k}": v / (global_batch_size if k.endswith("loss") else count)
+                for k, v in reduced_metrics.items()
+            }
+            reduced_metrics["train/lr"] = lr_this_step
+            return reduced_metrics
+
+
+def profiled_train_batches(train_loader: DataLoader, profiler: TrainingProfiler):
+    """Expose DataLoader blocking time as a record_function range."""
+    loader_iter = iter(train_loader)
+    while True:
+        try:
+            with profiler.record("train/data_wait"):
+                item = next(loader_iter)
+        except StopIteration:
+            return
+        yield item
 
 def evaluate(
     config: PretrainConfig,
@@ -599,6 +707,11 @@ def launch(hydra_config: DictConfig):
     z_logger = None
     if RANK == 0:
         progress_bar = tqdm.tqdm(total=train_state.total_steps)
+        # PERF-DEV-09 (recorded, NOT ratified): `config.model_dump()` now also
+        # carries the `perf_profiler` / `perf_benchmark` blocks, so every future
+        # science run's wandb config gains those two keys.  This touches an
+        # artifact downstream figure code reads; see the 2026-07-28 ledger in
+        # lab/reports/2026-07-26_experiment-speed-action-plan.md.
         wandb.init(project=config.project_name, name=config.run_name, config=config.model_dump(), settings=wandb.Settings(_disable_stats=True))  # type: ignore
         wandb.log({"num_params": sum(x.numel() for x in train_state.model.parameters())}, step=0)
         save_code_and_config(config)
@@ -625,64 +738,134 @@ def launch(hydra_config: DictConfig):
         ema_helper = EMAHelper(mu=config.ema_rate)
         ema_helper.register(train_state.model)
 
+    profiler = TrainingProfiler(
+        config.perf_profiler, checkpoint_path=config.checkpoint_path, rank=RANK
+    )
+    # Inert unless perf_benchmark.enabled and RANK == 0.  Constructed BEFORE
+    # `profiler.start()` (a documented deviation from the registered insertion
+    # order) so that the profiler/benchmark mutual-exclusion ValueError is raised
+    # before any profiler resource is acquired -- the raise happens outside the
+    # `try:` below, so a `finally: profiler.stop()` would not run for it.
+    #
+    # `config.perf_profiler.enabled` is passed rather than `profiler.enabled`
+    # because the latter is already False on non-zero ranks, which would make the
+    # check unreachable there for a different reason.  The check itself is
+    # rank-0-only by design (the frozen collector contract raises "when active
+    # and profiler_enabled", and TrainingBenchmark returns early on rank != 0):
+    # a non-zero rank with both features enabled stays silent, and the rank-0
+    # ValueError is what aborts the job under torchrun.
+    bench = TrainingBenchmark(
+        config.perf_benchmark,
+        checkpoint_path=config.checkpoint_path,
+        rank=RANK,
+        run_name=config.run_name,
+        seed=config.seed,
+        eval_interval=config.eval_interval,
+        resolved_config=config.model_dump(),
+        data_paths=config.data_paths,
+        profiler_enabled=config.perf_profiler.enabled,
+    )
+
+    if profiler.enabled:
+        profiler.start()
+
     # Training Loop
-    for _iter_id in range(total_iters):
-        print (f"[Rank {RANK}, World Size {WORLD_SIZE}]: Epoch {_iter_id * train_epochs_per_iter}")
+    try:
+        for _iter_id in range(total_iters):
+            print (f"[Rank {RANK}, World Size {WORLD_SIZE}]: Epoch {_iter_id * train_epochs_per_iter}")
 
-        ############ Train Iter
-        if RANK == 0:
-            print("TRAIN")
-        train_state.model.train()
-        for set_name, batch, global_batch_size in train_loader:
-            metrics = train_batch(config, train_state, batch, global_batch_size, rank=RANK, world_size=WORLD_SIZE)
-
-            if RANK == 0 and metrics is not None:
-                wandb.log(metrics, step=train_state.step)
-                progress_bar.update(train_state.step - progress_bar.n)  # type: ignore
-            if config.ema:
-                ema_helper.update(train_state.model)
-
-        if _iter_id >= config.min_eval_interval:
-            ############ Evaluation
+            ############ Train Iter
             if RANK == 0:
-                print("EVALUATE")
-            if config.ema:
-                print("SWITCH TO EMA")
-                train_state_eval = copy.deepcopy(train_state)
-                train_state_eval.model = ema_helper.ema_copy(train_state_eval.model)
+                print("TRAIN")
+            train_state.model.train()
+            if profiler.enabled:
+                # This branch alone adds record_function ranges.  (The default
+                # branch below is not otherwise untouched -- see its own
+                # comment for the inert benchmark calls it carries.)
+                for set_name, batch, global_batch_size in profiled_train_batches(train_loader, profiler):
+                    metrics = train_batch_profiled(
+                        config, train_state, batch, global_batch_size,
+                        rank=RANK, world_size=WORLD_SIZE, profiler=profiler,
+                    )
+
+                    if RANK == 0 and metrics is not None:
+                        with profiler.record("train/wandb"):
+                            wandb.log(metrics, step=train_state.step)
+                        progress_bar.update(train_state.step - progress_bar.n)  # type: ignore
+                    if config.ema:
+                        with profiler.record("train/ema"):
+                            ema_helper.update(train_state.model)
+                    profiler.step()
             else:
-                train_state_eval = train_state
-            train_state_eval.model.eval()
-            metrics = evaluate(config, 
-                train_state_eval, 
-                eval_loader, 
-                eval_metadata, 
-                evaluators,
-                rank=RANK, 
-                world_size=WORLD_SIZE,
-                cpu_group=CPU_PROCESS_GROUP)
+                # When the benchmark is off `batches is train_loader`, so this
+                # loop is byte-identical to the original hot path apart from the
+                # inert benchmark calls: the spans (each one attribute load +
+                # bool test + the shared _NULL_SPAN nullcontext) PLUS the
+                # non-span `bench.begin_update(...)` inside train_batch and
+                # `bench.end_update(...)` below, which return immediately when
+                # disabled.
+                batches = bench.iter_batches(train_loader) if bench.enabled else train_loader
+                for set_name, batch, global_batch_size in batches:
+                    metrics = train_batch(config, train_state, batch, global_batch_size, rank=RANK, world_size=WORLD_SIZE, bench=bench)
 
-            if RANK == 0 and metrics is not None:
-                wandb.log(metrics, step=train_state.step)
+                    if RANK == 0 and metrics is not None:
+                        with bench.wall_span("metrics_wandb"):
+                            wandb.log(metrics, step=train_state.step)
+                        progress_bar.update(train_state.step - progress_bar.n)  # type: ignore
+                    if config.ema:
+                        with bench.cuda_span("ema"):
+                            ema_helper.update(train_state.model)
+                    bench.end_update(train_state.step)
 
-            ############ z dynamics logging (rank 0 only, no-op when log_z_dynamics=False)
-            if z_logger is not None:
-                import functools as _functools
-                z_logger.log(
-                    model=train_state_eval.model,
-                    step=train_state.step,
-                    save_train_state_fn=_functools.partial(save_train_state, config),
-                    train_state=train_state_eval,
-                )
+            if _iter_id >= config.min_eval_interval:
+                ############ Evaluation
+                if RANK == 0:
+                    print("EVALUATE")
+                if config.ema:
+                    print("SWITCH TO EMA")
+                    train_state_eval = copy.deepcopy(train_state)
+                    train_state_eval.model = ema_helper.ema_copy(train_state_eval.model)
+                else:
+                    train_state_eval = train_state
+                train_state_eval.model.eval()
+                with bench.event_span("eval", train_state.step):
+                    metrics = evaluate(config,
+                        train_state_eval,
+                        eval_loader,
+                        eval_metadata,
+                        evaluators,
+                        rank=RANK,
+                        world_size=WORLD_SIZE,
+                        cpu_group=CPU_PROCESS_GROUP)
 
-            ############ Checkpointing
-            if RANK == 0:
-                print("SAVE CHECKPOINT")
-            if RANK == 0 and (config.checkpoint_every_eval or (_iter_id == total_iters - 1)):
-                save_train_state(config, train_state_eval)
+                if RANK == 0 and metrics is not None:
+                    wandb.log(metrics, step=train_state.step)
 
-            if config.ema:
-                del train_state_eval
+                ############ z dynamics logging (rank 0 only, no-op when log_z_dynamics=False)
+                if z_logger is not None:
+                    import functools as _functools
+                    with bench.event_span("zprobe", train_state.step):
+                        z_logger.log(
+                            model=train_state_eval.model,
+                            step=train_state.step,
+                            save_train_state_fn=_functools.partial(save_train_state, config),
+                            train_state=train_state_eval,
+                        )
+
+                ############ Checkpointing
+                if RANK == 0:
+                    print("SAVE CHECKPOINT")
+                if RANK == 0 and (config.checkpoint_every_eval or (_iter_id == total_iters - 1)):
+                    with bench.event_span("checkpoint", train_state.step):
+                        save_train_state(config, train_state_eval)
+
+                if config.ema:
+                    del train_state_eval
+    finally:
+        profiler.stop()
+        # Rows live in memory until here; this is the only write site for
+        # steady_state.csv / manifest.json.  No-op when the benchmark is off.
+        bench.finalize()
 
     # finalize
     if dist.is_initialized():

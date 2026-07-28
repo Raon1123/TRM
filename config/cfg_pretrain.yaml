@@ -56,7 +56,13 @@ perf_profiler:
   profile_memory: true
   with_stack: false
   export_chrome_trace: true
-  export_tensorboard_trace: true
+  # PERF-DEV-18: must not be true at the same time as export_chrome_trace —
+  # torch permits one kineto save per capture and the second aborts the run.
+  export_tensorboard_trace: false
+  # Folded stacks for flame charts (analysis/flamegraph.py). Requires with_stack.
+  # Declared here so a run can override it as perf_profiler.export_stacks=true
+  # rather than needing Hydra's +append form.
+  export_stacks: false
 
 # Opt-in only.  Set enabled=true *and* performance_only=true for a bounded
 # unprofiled timing run (M2); artifacts deliberately live outside checkpoints/.

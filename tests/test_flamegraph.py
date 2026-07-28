@@ -512,7 +512,13 @@ def test_svg_declares_matching_width_height_and_viewbox():
 
     assert root.get("width") == "900"
     assert root.get("viewBox") == f"0 0 900 {root.get('height')}"
-    assert "max-width:100%" in root.get("style", "")
+    # The root must carry NO CSS style. The responsive idiom
+    # style="max-width:100%;height:auto" works in browsers but makes cairosvg --
+    # the only rasteriser available here -- emit a single flat colour, which was
+    # caught on the real M3 capture: 1 distinct colour with the attribute, 7523
+    # without. A chart that cannot be rasterised cannot be checked by looking at
+    # it. width/height + viewBox already scale correctly where this is embedded.
+    assert root.get("style") is None
 
 
 def test_svg_is_self_contained_and_avoids_the_font_shorthand():

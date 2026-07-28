@@ -486,9 +486,16 @@ def render_svg(
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{_num(width)}" '
         f'height="{_num(canvas_height)}" '
         f'viewBox="0 0 {_num(width)} {_num(canvas_height)}" '
-        f'preserveAspectRatio="xMinYMin meet" '
-        f'style="max-width:100%;height:auto">'
+        f'preserveAspectRatio="xMinYMin meet">'
     )
+    # NOTE: do NOT put style="max-width:100%;height:auto" on the root <svg>.
+    # It is the usual responsive-SVG idiom and works in browsers, but cairosvg
+    # (our only available rasteriser) renders the whole canvas as a single flat
+    # colour when height:auto is present -- verified on the real M3 capture:
+    # with the attribute the PNG has exactly 1 distinct colour, without it 7523.
+    # A chart that cannot be rasterised cannot be verified by looking at it, and
+    # an unverifiable figure is worse than an ugly one.  width/height plus
+    # viewBox already scale correctly wherever this is embedded.
     out.append(
         f'<rect x="0" y="0" width="{_num(width)}" height="{_num(canvas_height)}" '
         f'fill="{BACKGROUND_COLOR}"/>'

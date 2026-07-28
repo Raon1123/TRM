@@ -60,8 +60,8 @@ CUDA is never touched at import time
     a host with no free GPU.
 
 ``gpu_util_pct`` is a driver-window aggregate, not a per-update measurement
-    The column is part of the frozen 25-column schema and is populated once per
-    measured row, but its source (``torch.cuda.utilization``, NVML-backed)
+    The column is part of the registered 26-column schema and is populated once
+    per measured row, but its source (``torch.cuda.utilization``, NVML-backed)
     reports "percent of the past sample period during which a kernel ran", and
     that period is between 1 s and 1/6 s.  A 200-row window of millisecond-scale
     updates spans far less than one such period, so consecutive rows repeat the
@@ -98,14 +98,15 @@ are written out as plain LIMITATIONS at the sites where they occur.
   ``>=`` comment) -- and note that the ``_window_closed`` gate immediately above
   it, not the step comparison, is what makes a mid-window device drain
   unreachable; the ledger ratifies the departure on exactly that ground.
-* PERF-DEV-02 -- AWAITING PI SIGN-OFF, not settled; behaviour is frozen until it
-  lands.  The ``metrics_device`` CUDA span is collected but has NO CSV column:
-  the timing contract asks for a CUDA event pair on metric-device work while the
-  25-column header is byte-frozen without such a column, and both cannot hold.
-  The span's ``summarize()`` aggregate is published in ``manifest.json`` under
-  ``extra_span_summary``.  The ledger *recommends* keeping the byte-freeze and
-  ratifying the manifest route, but records the decision as the PI's because it
-  reinterprets a pre-registered schema.
+* PERF-DEV-02 -- RESOLVED by PI decision 2026-07-28.  The pre-registration was
+  internally contradictory: the timing contract asked for a CUDA event pair on
+  metric-device work while the 25-column header was byte-frozen without such a
+  column.  The PI amended the SCHEMA rather than preserving the freeze, so
+  ``metrics_device_cuda_ms`` is now a first-class column (26 total), placed after
+  ``ema_cuda_ms`` to keep the five CUDA columns in the contract's own order.
+  ``SCHEMA_VERSION`` was raised 1 -> 2; version-1 artifacts predate the column
+  and must not be pooled with version-2 rows.  ``extra_span_summary`` still
+  carries the aggregate as a convenience but is no longer authoritative.
 * PERF-DEV-03 -- RATIFIED at implementation level.  ``data_wait`` is bracketed
   before its row exists, so it is staged and promoted into the update it fed
   instead of being dropped.
@@ -135,16 +136,14 @@ are written out as plain LIMITATIONS at the sites where they occur.
   update is free of device serialisation.  One line of
   ``torch.cuda.set_sync_debug_mode("warn")`` on an approved M2 run confirms it;
   the item feeds Phase 1 candidate 3 (non-blocking H2D).
-* PERF-DEV-10 -- AWAITING PI SIGN-OFF, not settled; behaviour is frozen until it
-  lands.  Artifact scope: a completed M2 baseline repeat writes
-  ``steady_state.csv`` and ``manifest.json`` only.  ``append_equivalence_ledger``
-  and ``capture_resource_manifest`` are deliberately caller-less here --
-  ``equivalence_ledger.csv`` is a G1/G2 *gate* artifact (its candidate/control
-  IDs and G1/G2 status cannot be filled by a baseline run that has no
-  candidate), and the resource manifest is P0.0's.  The ledger finds that
-  argument sound and *recommends* moving the equivalence ledger from a P0.1a
-  required artifact to a G1 one, but that edits pre-registered contract text and
-  so is the PI's call, not the implementer's.
+* PERF-DEV-10 -- RESOLVED by PI decision 2026-07-28.  ``equivalence_ledger.csv``
+  moves from a P0.1a required artifact to a G1 one, so a completed M2 baseline
+  repeat writes ``steady_state.csv`` and ``manifest.json`` only -- that is now
+  the contract, not a shortfall against it.  ``append_equivalence_ledger`` stays
+  caller-less here by design: its candidate/control IDs and G1/G2 status cannot
+  be filled by a baseline run that has no candidate.  G1 calls it.
+  ``capture_resource_manifest`` is likewise caller-less because it is P0.0's,
+  invoked by hand.
 """
 
 from __future__ import annotations
@@ -182,7 +181,10 @@ import torch
 # Module constants (frozen; values are part of the artifact contract)
 # --------------------------------------------------------------------------- #
 
-SCHEMA_VERSION: str = "perf_benchmark/1"
+#: Raised 1 -> 2 by the PERF-DEV-02 schema amendment (25 -> 26 columns,
+#: PI decision 2026-07-28).  Any artifact stamped ``perf_benchmark/1`` predates
+#: ``metrics_device_cuda_ms`` and must not be pooled with version-2 rows.
+SCHEMA_VERSION: str = "perf_benchmark/2"
 RESOURCE_SCHEMA_VERSION: str = "perf_benchmark.resource/1"
 
 #: Written for any counter that was never captured.  Never write ``0.0`` for a
@@ -216,6 +218,12 @@ STEADY_STATE_COLUMNS: tuple[str, ...] = (
     "forward_backward_cuda_ms",
     "optimizer_cuda_ms",
     "ema_cuda_ms",
+    # PERF-DEV-02, PI-decided 2026-07-28: the schema was amended 25 -> 26 columns
+    # so the timing contract's metric-device CUDA bracket has a first-class
+    # output.  Placed after ``ema_cuda_ms`` so the five CUDA columns run in the
+    # contract's own enumeration order (H2D -> forward+backward -> optimizer ->
+    # EMA -> metric-device).
+    "metrics_device_cuda_ms",
     "metrics_wandb_wall_ms",
     "eval_event_ms",
     "zprobe_event_ms",
@@ -254,17 +262,19 @@ _CUDA_SPAN_SET = frozenset(CUDA_SPAN_NAMES)
 _WALL_SPAN_SET = frozenset(WALL_SPAN_NAMES)
 _EVENT_SPAN_SET = frozenset(EVENT_SPAN_NAMES)
 
-#: ``metrics_device`` has no column in the frozen 25-column schema (PERF-DEV-02
-#: in the module docstring -- AWAITING PI SIGN-OFF, so this stands unchanged
-#: meanwhile).  It is still collected, and its aggregate is
-#: published in ``manifest.json`` under ``extra_span_summary`` so that the CSV
-#: header stays byte-frozen.
+#: PERF-DEV-02 RESOLVED (PI decision 2026-07-28): ``metrics_device`` now has its
+#: own column.  The pre-registration was internally contradictory -- the timing
+#: contract mandated a metric-device CUDA bracket while the 25-column schema had
+#: nowhere to put it -- and the PI resolved it by amending the schema to 26
+#: columns rather than by preserving the byte-freeze.  ``schema_version`` was
+#: raised accordingly.  ``manifest.json``'s ``extra_span_summary`` is no longer
+#: the authoritative home for this span.
 _CUDA_SPAN_COLUMN: dict[str, Optional[str]] = {
     "h2d": "h2d_cuda_ms",
     "forward_backward": "forward_backward_cuda_ms",
     "optimizer": "optimizer_cuda_ms",
     "ema": "ema_cuda_ms",
-    "metrics_device": None,
+    "metrics_device": "metrics_device_cuda_ms",
 }
 _WALL_SPAN_COLUMN: dict[str, str] = {
     "data_wait": "data_wait_ms",
@@ -1091,7 +1101,9 @@ class TrainingBenchmark:
             out[column] = wall.get(name, MISSING)
         for name, column in _CUDA_SPAN_COLUMN.items():
             if column is None:
-                continue  # metrics_device -> manifest extra_span_summary (PERF-DEV-02)
+                # No span maps to None since PERF-DEV-02 was resolved; the guard
+                # stays because the mapping's type still admits it.
+                continue
             out[column] = cuda.get(name, MISSING)
         for name, (event_col, amortized_col) in _EVENT_SPAN_COLUMN.items():
             event_ms = self._event_ms.get(name, MISSING)
@@ -1105,8 +1117,9 @@ class TrainingBenchmark:
             "rows_dropped_incomplete": self._rows_dropped_incomplete,
             "window_closed": self._window_closed,
         }
-        # metrics_device has no CSV column by design (PERF-DEV-02); publish its
-        # aggregate here so the frozen 25-column header stays byte-stable.
+        # Since PERF-DEV-02 was resolved, ``metrics_device_cuda_ms`` is a
+        # first-class CSV column and the CSV is authoritative.  This aggregate is
+        # kept as a convenience summary only -- it is not the span's home.
         values = [
             r["_cuda"]["metrics_device"]
             for r in self._rows
@@ -1228,7 +1241,7 @@ def _format_cell(column: str, value: Any) -> Any:
 
 
 def write_steady_state_csv(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
-    """Write the frozen 25-column steady-state CSV.
+    """Write the registered 26-column steady-state CSV.
 
     ``DictWriter`` silently writes ``''`` for a *missing* fieldname, so the
     explicit key-set check below is what actually guarantees schema fidelity.

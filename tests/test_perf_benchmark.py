@@ -65,12 +65,17 @@ from utils.perf_benchmark import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-#: The 25 frozen columns, transcribed from the pre-registration rather than
+#: The 26 registered columns, transcribed from the pre-registration rather than
 #: imported, so this file fails if the module constant is ever edited.
+#: Amended 25 -> 26 by PI decision 2026-07-28 (PERF-DEV-02): the timing contract
+#: mandates a metric-device CUDA bracket, so ``metrics_device_cuda_ms`` gets a
+#: first-class column, ordered after ``ema_cuda_ms`` so the five CUDA columns
+#: follow the contract's enumeration.
 FROZEN_HEADER = (
     "schema_version,condition_id,run_id,repeat,seed,step,global_effective_batch,"
     "input_tokens,target_tokens,data_wait_ms,update_wall_ms,h2d_cuda_ms,"
-    "forward_backward_cuda_ms,optimizer_cuda_ms,ema_cuda_ms,metrics_wandb_wall_ms,"
+    "forward_backward_cuda_ms,optimizer_cuda_ms,ema_cuda_ms,"
+    "metrics_device_cuda_ms,metrics_wandb_wall_ms,"
     "eval_event_ms,zprobe_event_ms,checkpoint_event_ms,eval_amortized_ms,"
     "zprobe_amortized_ms,checkpoint_amortized_ms,max_memory_allocated,"
     "max_memory_reserved,gpu_util_pct"
@@ -433,7 +438,7 @@ def test_disabled_path_is_a_strict_no_op(tmp_path: Path, monkeypatch: pytest.Mon
 # --------------------------------------------------------------------------- #
 
 
-def test_steady_state_header_is_the_frozen_25_columns(tmp_path: Path):
+def test_steady_state_header_is_the_registered_26_columns(tmp_path: Path):
     bench, clock, _ = make_bench(tmp_path, measured_steps=2)
     drive_update(bench, clock, 1)
     drive_update(bench, clock, 2)
@@ -441,7 +446,7 @@ def test_steady_state_header_is_the_frozen_25_columns(tmp_path: Path):
 
     header_cells, rows = read_csv(bench.session_dir)
     assert header_cells == FROZEN_HEADER.split(",")
-    assert len(header_cells) == 25
+    assert len(header_cells) == 26
     assert tuple(header_cells) == STEADY_STATE_COLUMNS  # module constant agrees
     assert len(rows) == 2
     assert rows[0]["schema_version"] == SCHEMA_VERSION
@@ -456,7 +461,10 @@ def test_write_steady_state_csv_rejects_a_schema_mismatch(tmp_path: Path):
         write_steady_state_csv(tmp_path / "a.csv", [short])
 
     wide = dict(good)
-    wide["metrics_device_cuda_ms"] = 1.0  # PERF-DEV-02: must never appear
+    # Any column outside the registered set is rejected.  This used to use
+    # metrics_device_cuda_ms, which PERF-DEV-02 has since promoted to a real
+    # column (PI 2026-07-28), so the probe now uses a genuinely unknown name.
+    wide["not_a_registered_column"] = 1.0
     with pytest.raises(ValueError, match="frozen schema"):
         write_steady_state_csv(tmp_path / "b.csv", [wide])
 
@@ -487,19 +495,34 @@ def test_cuda_spans_land_in_their_own_columns(tmp_path: Path):
     assert _FLOAT_CELL.match(row["metrics_wandb_wall_ms"])
 
 
-def test_metrics_device_is_absent_from_csv_and_summarized_in_manifest(tmp_path: Path):
-    """PERF-DEV-02: metrics_device has no frozen column; aggregate -> manifest."""
+def test_metrics_device_has_its_own_csv_column(tmp_path: Path):
+    """PERF-DEV-02 (PI 2026-07-28): metrics_device is a first-class column.
+
+    This test previously asserted the OPPOSITE -- that the span was absent from
+    the CSV and lived only in the manifest -- because the 25-column header was
+    byte-frozen without a slot for it.  The PI resolved the contract's internal
+    contradiction by amending the schema instead, so the assertion is inverted
+    deliberately, not relaxed.
+    """
     bench, clock, _ = make_bench(tmp_path, measured_steps=2)
     drive_update(bench, clock, 1)
     drive_update(bench, clock, 2)
     bench.finalize()
 
     header_cells, rows = read_csv(bench.session_dir)
-    assert not any("metrics_device" in c for c in header_cells)
+    assert "metrics_device_cuda_ms" in header_cells
+    # Ordered after ema_cuda_ms, so the five CUDA columns run in the timing
+    # contract's own enumeration order.
+    assert (
+        header_cells.index("metrics_device_cuda_ms")
+        == header_cells.index("ema_cuda_ms") + 1
+    )
     for row in rows:
-        # 16.0 is the metrics_device duration; it must appear in no cell.
-        assert "16.000000" not in row.values()
+        # 16.0 is the metrics_device duration; it must now land in that column.
+        assert float(row["metrics_device_cuda_ms"]) == pytest.approx(16.0)
 
+    # The manifest aggregate is retained as a convenience, but is no longer the
+    # authoritative home for the span.
     summary = read_manifest(bench.session_dir)["extra_span_summary"][
         "metrics_device_cuda_ms"
     ]

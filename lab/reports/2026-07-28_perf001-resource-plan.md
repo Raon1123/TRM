@@ -151,6 +151,38 @@ T1은 **GPU 없이 지금 구현 가능**하며 P0.0/M2를 기다리지 않는�
 Phase 1 진입 시점에 구현한다. 단, T2의 **하네스**(고정 batch 기록·비교 유틸)는 후보보다 먼저
 만들어 둘 수 있고, `append_equivalence_ledger`가 이미 그 소비처다.
 
+### T1 결과 (2026-07-28, 독립 게이트 PASS)
+
+`tests/test_perf_equivalence.py` (9 test). 전체 스위트 **369 passed**.
+**test-only 추가** — `pretrain.py`·`utils/perf_benchmark.py`·config는 수정되지 않았다.
+즉 테스트를 통과시키려 하네스를 굽히지 않았다는 것 자체가 증거다.
+
+같은 고정 batch 시퀀스를 동일 초기 상태에서 **실제 `pretrain.train_batch`** 로 두 번
+(enabled/disabled) 재생하고 전체 trace를 `==` 로 비교한다. 비교 대상: model 호출 순번·carry·
+batch signature·`return_keys`, `initial_carry` 호출, optimizer step/zero_grad 횟수, `param_groups`에
+실제로 기록된 **lr 시퀀스**(스케줄이 상수가 아님을 별도 단언 — 뒤섞인 스케줄이 우연히 같아질 수
+없게), 반환 metrics 전 키·값, `train_state.step`/carry 진행, batch 값별 `.cuda()` 횟수, loader
+1회 소비와 객체 동일성, 모델이 예외를 던질 때의 예외 동일성과 롤백. 부동소수는
+`(type, dtype, float.hex())`로 정규화 — `-0.0`과 `0.0`을 구분하고 `NaN==NaN`을 성립시키므로
+단순 `==`보다 강하다. 동등성 단언에 `pytest.approx`는 쓰이지 않는다.
+window는 warmup/measured/post-window/`total_steps` early-return을 모두 가로지른다.
+
+**비공허성은 독립 게이트가 mutation 주입으로 증명했다**(구현자 주장에 의존하지 않음):
+계측이 batch 값마다 `.cuda()`를 한 번 더 부르게 하자 **9개 중 4개가 red**(`.cuda()` 횟수를
+명시적으로 단언하지 않는 테스트까지 포함 — 전체-trace 비교가 작동한다는 뜻),
+`_CudaSpan.__exit__`가 예외를 삼키게 하자 의도한 **1개가 red**.
+
+**경계 (과대주장 금지).** 확립된 것은 **제어 흐름과 bookkeeping의 동등성**이지 실제 커널
+수치의 동등성이 아니다. 또한 `train_batch`는 실물이지만 이를 감싸는 학습 루프는
+`pretrain.launch()`의 span 호출부를 **재현한 mirror**다. 알려진 불일치 2건을 기록한다:
+(a) mirror는 loop-level `wall_span("metrics_wandb")`/`cuda_span("ema")`를 무조건 여는 반면
+프로덕션은 각각 `RANK==0 and metrics is not None`, `config.ema`로 가드한다 — `total_steps`
+early-return 업데이트에서 프로덕션이 열지 않을 span을 mirror가 연다;
+(b) mirror는 dict를, 프로덕션은 `(set_name, batch, global_batch_size)` 3-tuple을 순회한다
+(`iter_batches`는 항목을 그대로 yield하므로 무해하나 loader 계약이 다르다).
+따라서 **루프 수준 주장은 재현물에 근거**하며, 실물 `launch()`에 대한 것이 아니다.
+bf16 커널·`torch.compile`·실제 CUDA event·DDP는 T2와 승인된 GPU run의 몫으로 남는다.
+
 ## 6. 이 계획이 열어주지 않는 것
 
 - **M2 emitter가 존재한다는 사실은 실행 허가가 아니다.** `PERF0_ALLOW_ENQUEUE=1` 펜스가

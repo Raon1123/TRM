@@ -97,6 +97,11 @@ class PretrainConfig(pydantic.BaseModel):
     phase_patience: int = 2
 
     # The normal path constructs an inert profiler; see perf_profiler.py.
+    # PERF-001 candidate P1-A rollback switch. False keeps the registered
+    # unique()-based sparse-embedding update; True uses the dense scatter that
+    # avoids the per-step device-to-host sync. Off by default until G1/G2 pass.
+    puzzle_emb_dense_update: bool = False
+
     perf_profiler: PerfProfilerConfig = pydantic.Field(default_factory=PerfProfilerConfig)
     # The normal path constructs an inert benchmark; see perf_benchmark.py.
     perf_benchmark: PerfBenchmarkConfig = pydantic.Field(default_factory=PerfBenchmarkConfig)
@@ -181,7 +186,8 @@ def create_model(config: PretrainConfig, train_metadata: PuzzleDatasetMetadata, 
                 model.model.puzzle_emb.buffers(),  # type: ignore
                 lr=0,  # Needs to be set by scheduler
                 weight_decay=config.puzzle_emb_weight_decay,
-                world_size=world_size
+                world_size=world_size,
+                dense_update=config.puzzle_emb_dense_update,
             )
         ]
         optimizer_lrs = [
@@ -193,7 +199,8 @@ def create_model(config: PretrainConfig, train_metadata: PuzzleDatasetMetadata, 
                 model.model.puzzle_emb.buffers(),  # type: ignore
                 lr=1.0e-6,  # Needs to be set by scheduler
                 weight_decay=config.puzzle_emb_weight_decay,
-                world_size=world_size
+                world_size=world_size,
+                dense_update=config.puzzle_emb_dense_update,
             ),
             AdamATan2(
                 model.parameters(),

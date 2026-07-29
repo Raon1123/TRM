@@ -178,6 +178,21 @@ class Frame:
 # --- parsing ---------------------------------------------------------------
 
 
+#: Name given to samples a profiler could not attribute to any Python frame.
+#: py-spy emits these as a bare value with no stack; for a training loop they are
+#: mostly native code running with the GIL released (CUDA kernels, libtorch).
+NO_PYTHON_FRAME = "(no python frame)"
+
+
+def _looks_numeric(token: str) -> bool:
+    """True when a lone token is a finite, non-negative number (a bare value)."""
+    try:
+        v = float(token)
+    except ValueError:
+        return False
+    return math.isfinite(v) and v >= 0
+
+
 def parse_folded(lines: Iterable[str], *, strict: bool = True) -> FoldedStacks:
     """Parse folded-stack text.
 
@@ -189,8 +204,15 @@ def parse_folded(lines: Iterable[str], *, strict: bool = True) -> FoldedStacks:
       (``<built-in method mm of type object>``).
     * blank / whitespace-only lines and ``#`` comments -> skipped, not an
       issue.  They carry no data.
-    * missing value, non-numeric value, NaN/inf, **negative** value, empty
-      stack, or an empty frame inside the stack (``a;;b``) -> rejected.
+    * a lone numeric token (``1286``, i.e. a value with **no** stack) ->
+      accepted as a single frame named :data:`NO_PYTHON_FRAME`.  py-spy emits
+      this for samples it cannot attribute to any Python frame -- native code
+      holding no Python frame, which in a training loop is largely the CUDA
+      kernels.  Rejecting it would shrink the denominator and silently inflate
+      every other frame's percentage; naming it keeps the chart honest.
+      A lone **non**-numeric token (``a;b``) is still a missing-value error.
+    * missing value, non-numeric value, NaN/inf, **negative** value, or an
+      empty frame inside the stack (``a;;b``) -> rejected.
       ``strict=True`` (the default) raises :class:`FoldedStackError` on the
       first one; ``strict=False`` records a :class:`ParseIssue` and continues.
     * a value of exactly ``0`` is accepted (torch emits these); it simply adds
@@ -210,10 +232,23 @@ def parse_folded(lines: Iterable[str], *, strict: bool = True) -> FoldedStacks:
             continue
 
         parts = stripped.rsplit(None, 1)
-        if len(parts) != 2:
+        if len(parts) == 2:
+            stack_text, value_text = parts
+        elif len(parts) == 1 and _looks_numeric(parts[0]):
+            # py-spy emits a bare value with no stack (e.g. " 1286") for samples
+            # it cannot attribute to any Python frame -- native code running with
+            # the GIL released, which for a training loop is largely the CUDA
+            # kernels themselves.  That is real signal, not corruption: dropping
+            # it would silently shrink the denominator and inflate every other
+            # frame's percentage.  Keep it under an explicit name instead.
+            #
+            # Gated on the token being numeric so that a genuine stack-without-a-
+            # value ("a;b") stays a missing-value error rather than being
+            # misread as an empty stack whose value happens to be "a;b".
+            stack_text, value_text = NO_PYTHON_FRAME, parts[0]
+        else:
             _reject(result, line_number, "missing value (expected 'stack <value>')", text, strict)
             continue
-        stack_text, value_text = parts
 
         try:
             value = float(value_text)
@@ -228,8 +263,9 @@ def parse_folded(lines: Iterable[str], *, strict: bool = True) -> FoldedStacks:
             continue
 
         if not stack_text.strip():
-            _reject(result, line_number, "empty stack", text, strict)
-            continue
+            # Same case as the bare-value line above, reached when the stack is
+            # whitespace rather than absent.  Name it rather than discard it.
+            stack_text = NO_PYTHON_FRAME
         frames = [frame.strip() for frame in stack_text.split(";")]
         if any(not frame for frame in frames):
             _reject(result, line_number, "empty frame in stack", text, strict)
@@ -553,7 +589,19 @@ def render_svg(
             f'fill="{fill}" stroke="{FRAME_STROKE}" '
             f'stroke-width="0.5"/>'
         )
-        label = None if frame.ratio < MIN_LABEL_RATIO else fit_label(frame.name, frame.width)
+        label = None
+        if frame.ratio >= MIN_LABEL_RATIO:
+            # Try "name (pct%)" first -- the box width already encodes this same
+            # ratio, so an on-frame number lets a reader rank same-looking
+            # siblings without decoding relative widths by eye (fig-qa
+            # 2026-07-29: two independent blind readers of a close multi-way
+            # split could not do this from width alone). Only used whole: a
+            # truncated "name (43.2..." carries no more signal than a bare
+            # truncated name, so any cut falls back to the untruncated pct-free
+            # path unchanged.
+            annotated = f"{frame.name} ({pct:.1f}%)"
+            fitted = fit_label(annotated, frame.width)
+            label = fitted if fitted == annotated else fit_label(frame.name, frame.width)
         if label:
             out.append(
                 f'<text x="{_num(frame.x + FRAME_TEXT_PAD)}" '

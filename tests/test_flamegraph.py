@@ -46,6 +46,7 @@ from analysis.flamegraph import (  # noqa: E402
     render_folded_text,
     render_svg,
     units_for_metric,
+    NO_PYTHON_FRAME,
 )
 
 SVG_NS = "{http://www.w3.org/2000/svg}"
@@ -677,3 +678,46 @@ def test_very_deep_stacks_do_not_hit_a_recursion_limit():
 
     root = ET.fromstring(svg)
     assert float(root.get("height")) > 2000 * ROW_HEIGHT
+
+
+# --------------------------------------------------------------------------
+# py-spy interop: samples with no attributable Python frame
+# --------------------------------------------------------------------------
+
+
+def test_bare_numeric_line_becomes_a_named_frame_not_a_rejection():
+    """py-spy writes ' 1286' for samples with no Python frame.
+
+    Rejecting it would drop real signal AND shrink the denominator, inflating
+    every other frame's percentage.  It must survive as an explicit frame.
+    """
+    parsed = parse_folded(["a;b 10", " 1286"])
+
+    assert parsed.issues == []
+    assert ((NO_PYTHON_FRAME,), 1286.0) in parsed.samples
+    assert parsed.total == pytest.approx(1296.0)
+
+    root = build_tree(parsed.samples)
+    assert root.total == pytest.approx(1296.0)
+    assert NO_PYTHON_FRAME in root.children
+
+
+def test_lone_non_numeric_token_is_still_a_missing_value_error():
+    """The bare-value rule must not swallow a genuine stack-without-a-value."""
+    with pytest.raises(FoldedStackError) as excinfo:
+        parse_folded(["a;b"])
+    assert "missing value" in excinfo.value.reason
+
+
+def test_real_pyspy_output_parses_without_lenient_mode(tmp_path):
+    """End-to-end shape of an actual `py-spy record --format raw` file."""
+    text = (
+        "<module> (train.py:8);outer (train.py:7);inner (train.py:4) 161\n"
+        "<module> (train.py:8);outer (train.py:7) 12\n"
+        " 40\n"
+    )
+    parsed = parse_folded(text.splitlines())
+
+    assert parsed.issues == []
+    assert parsed.total == pytest.approx(213.0)
+    assert NO_PYTHON_FRAME in render_folded_text(text)

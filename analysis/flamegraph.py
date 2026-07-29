@@ -591,17 +591,19 @@ def render_svg(
         )
         label = None
         if frame.ratio >= MIN_LABEL_RATIO:
-            # Try "name (pct%)" first -- the box width already encodes this same
-            # ratio, so an on-frame number lets a reader rank same-looking
-            # siblings without decoding relative widths by eye (fig-qa
-            # 2026-07-29: two independent blind readers of a close multi-way
-            # split could not do this from width alone). Only used whole: a
-            # truncated "name (43.2..." carries no more signal than a bare
-            # truncated name, so any cut falls back to the untruncated pct-free
-            # path unchanged.
-            annotated = f"{frame.name} ({pct:.1f}%)"
-            fitted = fit_label(annotated, frame.width)
-            label = fitted if fitted == annotated else fit_label(frame.name, frame.width)
+            # An on-frame number lets a reader rank same-looking siblings without
+            # decoding relative box widths by eye (fig-qa 2026-07-29: two
+            # independent blind readers of a close multi-way split could not do
+            # this from width alone). The real torch frame names here are long
+            # repr strings ("<built-in method mm of type object at 0x...>"), so
+            # reserving room for the suffix *first* and truncating the name
+            # around it -- rather than trying the whole "name (pct%)" and giving
+            # up if it doesn't fit -- is what actually gets the percentage drawn
+            # on the frames fig-qa flagged, not just on short-named ones.
+            suffix = f" ({pct:.1f}%)"
+            reserved_width = len(suffix) * FONT_SIZE * CHAR_WIDTH_RATIO
+            name_part = fit_label(frame.name, frame.width - reserved_width)
+            label = f"{name_part}{suffix}" if name_part else fit_label(frame.name, frame.width)
         if label:
             out.append(
                 f'<text x="{_num(frame.x + FRAME_TEXT_PAD)}" '

@@ -436,9 +436,34 @@ def test_long_names_are_truncated_with_an_ellipsis_but_kept_whole_in_the_tooltip
 
     labels = [t.text for t in root.iter(f"{SVG_NS}text")]
     truncated = [t for t in labels if t and t.startswith("torch/nn")]
-    assert truncated and truncated[0].endswith("...")
+    assert truncated and "..." in truncated[0]
     assert len(truncated[0]) < len(long_name)
     assert any(long_name in (t.text or "") for t in root.iter(f"{SVG_NS}title"))
+
+
+def test_on_frame_label_carries_a_percentage_when_the_box_has_room():
+    # Two evenly-split siblings, each with a plain short name -- plenty of room
+    # for "name (50.0%)" whole. fig-qa 2026-07-29: without this, ranking
+    # same-width siblings requires decoding relative box widths by eye.
+    folded = "left 50\nright 50\n"
+    svg = render_folded_text(folded, width=400)
+    labels = {t.text for t in ET.fromstring(svg).iter(f"{SVG_NS}text")}
+    assert "left (50.0%)" in labels
+    assert "right (50.0%)" in labels
+
+
+def test_long_name_percentage_reserves_room_for_the_suffix_before_truncating():
+    # A long repr-style name (real torch frames: "<built-in method mm of type
+    # object at 0x...>") must still surface its percentage: the name truncates
+    # around the suffix rather than the suffix being dropped because the whole
+    # "name (pct%)" string didn't fit.
+    long_name = "<built-in method mm of type object at 0x7f1869aa9b40>"
+    folded = f"{long_name} 30\nother 70\n"
+    svg = render_folded_text(folded, width=400)
+    labels = [t.text for t in ET.fromstring(svg).iter(f"{SVG_NS}text")]
+    mm_label = next(t for t in labels if t and t.startswith("<"))
+    assert mm_label.endswith("(30.0%)")
+    assert "..." in mm_label
 
 
 def test_fit_label_returns_none_when_the_box_cannot_hold_a_readable_label():

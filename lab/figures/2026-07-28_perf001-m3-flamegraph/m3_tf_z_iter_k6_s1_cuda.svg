@@ -6,52 +6,52 @@
 <g>
 <title>all (20,238,091 us, 100.00%)</title>
 <rect x="10" y="616" width="1180" height="15" fill="#df5514" stroke="#ffffff" stroke-width="0.5"/>
-<text x="13" y="627" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">all</text>
+<text x="13" y="627" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">all (100.0%)</text>
 </g>
 <g>
 <title>pretrain.py(877):_&lt;module&gt; (20,238,091 us, 100.00%)</title>
 <rect x="10" y="600" width="1180" height="15" fill="#e9831f" stroke="#ffffff" stroke-width="0.5"/>
-<text x="13" y="611" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">pretrain.py(877):_&lt;module&gt;</text>
+<text x="13" y="611" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">pretrain.py(877):_&lt;module&gt; (100.0%)</text>
 </g>
 <g>
 <title>hydra/main.py(94):_decorated_main (20,238,091 us, 100.00%)</title>
 <rect x="10" y="584" width="1180" height="15" fill="#df5414" stroke="#ffffff" stroke-width="0.5"/>
-<text x="13" y="595" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/main.py(94):_decorated_main</text>
+<text x="13" y="595" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/main.py(94):_decorated_main (100.0%)</text>
 </g>
 <g>
 <title>hydra/_internal/utils.py(394):__run_hydra (20,238,091 us, 100.00%)</title>
 <rect x="10" y="568" width="1180" height="15" fill="#ce0802" stroke="#ffffff" stroke-width="0.5"/>
-<text x="13" y="579" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">hydra/_internal/utils.py(394):__run_hydra</text>
+<text x="13" y="579" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">hydra/_internal/utils.py(394):__run_hydra (100.0%)</text>
 </g>
 <g>
 <title>hydra/_internal/utils.py(457):__run_app (20,238,091 us, 100.00%)</title>
 <rect x="10" y="552" width="1180" height="15" fill="#f1a627" stroke="#ffffff" stroke-width="0.5"/>
-<text x="13" y="563" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/_internal/utils.py(457):__run_app</text>
+<text x="13" y="563" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/_internal/utils.py(457):__run_app (100.0%)</text>
 </g>
 <g>
 <title>hydra/_internal/utils.py(220):_run_and_report (20,238,091 us, 100.00%)</title>
 <rect x="10" y="536" width="1180" height="15" fill="#db410f" stroke="#ffffff" stroke-width="0.5"/>
-<text x="13" y="547" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/_internal/utils.py(220):_run_and_report</text>
+<text x="13" y="547" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/_internal/utils.py(220):_run_and_report (100.0%)</text>
 </g>
 <g>
 <title>hydra/_internal/utils.py(458):_&lt;lambda&gt; (20,238,091 us, 100.00%)</title>
 <rect x="10" y="520" width="1180" height="15" fill="#f3b12a" stroke="#ffffff" stroke-width="0.5"/>
-<text x="13" y="531" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/_internal/utils.py(458):_&lt;lambda&gt;</text>
+<text x="13" y="531" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/_internal/utils.py(458):_&lt;lambda&gt; (100.0%)</text>
 </g>
 <g>
 <title>hydra/_internal/hydra.py(119):_run (20,238,091 us, 100.00%)</title>
 <rect x="10" y="504" width="1180" height="15" fill="#de4f12" stroke="#ffffff" stroke-width="0.5"/>
-<text x="13" y="515" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/_internal/hydra.py(119):_run</text>
+<text x="13" y="515" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/_internal/hydra.py(119):_run (100.0%)</text>
 </g>
 <g>
 <title>hydra/core/utils.py(186):_run_job (20,238,091 us, 100.00%)</title>
 <rect x="10" y="488" width="1180" height="15" fill="#de5113" stroke="#ffffff" stroke-width="0.5"/>
-<text x="13" y="499" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/core/utils.py(186):_run_job</text>
+<text x="13" y="499" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/core/utils.py(186):_run_job (100.0%)</text>
 </g>
 <g>
 <title>pretrain.py(798):_launch (20,238,091 us, 100.00%)</title>
 <rect x="10" y="472" width="1180" height="15" fill="#e6741b" stroke="#ffffff" stroke-width="0.5"/>
-<text x="13" y="483" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">pretrain.py(798):_launch</text>
+<text x="13" y="483" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">pretrain.py(798):_launch (100.0%)</text>
 </g>
 <g>
 <title>models/ema.py(16):_update (28,902 us, 0.14%)</title>
@@ -60,7 +60,7 @@
 <g>
 <title>pretrain.py(373):_train_batch_profiled (20,209,189 us, 99.86%)</title>
 <rect x="11.685" y="456" width="1178.315" height="15" fill="#d11405" stroke="#ffffff" stroke-width="0.5"/>
-<text x="14.685" y="467" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">pretrain.py(373):_train_batch_profiled</text>
+<text x="14.685" y="467" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">pretrain.py(373):_train_batch_profiled (99.9%)</text>
 </g>
 <g>
 <title>&lt;built-in_method_cpu_of_Tensor_object_at_0x7f1794e50640&gt; (60 us, 0.00%)</title>
@@ -73,112 +73,112 @@
 <g>
 <title>&lt;built-in_method_stack_of_type_object_at_0x7f1869aa9b40&gt; (2,701,065 us, 13.35%)</title>
 <rect x="19.948" y="440" width="157.488" height="15" fill="#ef9d25" stroke="#ffffff" stroke-width="0.5"/>
-<text x="22.948" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;built-in_method_...</text>
+<text x="22.948" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;built-in... (13.3%)</text>
 </g>
 <g>
 <title>torch/_dynamo/eval_frame.py(453):___call__ (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="440" width="677.005" height="15" fill="#f0a527" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_dynamo/eval_frame.py(453):___call__</text>
+<text x="180.436" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_dynamo/eval_frame.py(453):___call__ (57.4%)</text>
 </g>
 <g>
 <title>nn.Module:_OptimizedModule_0 (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="424" width="677.005" height="15" fill="#f2ae29" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="435" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">nn.Module:_OptimizedModule_0</text>
+<text x="180.436" y="435" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">nn.Module:_OptimizedModule_0 (57.4%)</text>
 </g>
 <g>
 <title>torch/nn/modules/module.py(1780):__call_impl (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="408" width="677.005" height="15" fill="#ce0501" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="419" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/nn/modules/module.py(1780):__call_impl</text>
+<text x="180.436" y="419" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/nn/modules/module.py(1780):__call_impl (57.4%)</text>
 </g>
 <g>
 <title>torch/_dynamo/eval_frame.py(904):_compile_wrapper (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="392" width="677.005" height="15" fill="#d62a0a" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="403" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_dynamo/eval_frame.py(904):_compile_wrapper</text>
+<text x="180.436" y="403" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_dynamo/eval_frame.py(904):_compile_wrapper (57.4%)</text>
 </g>
 <g>
 <title>nn.Module:_ACTLossHead_0 (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="376" width="677.005" height="15" fill="#e46e1a" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="387" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">nn.Module:_ACTLossHead_0</text>
+<text x="180.436" y="387" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">nn.Module:_ACTLossHead_0 (57.4%)</text>
 </g>
 <g>
 <title>torch/nn/modules/module.py(1780):__call_impl (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="360" width="677.005" height="15" fill="#ce0501" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="371" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/nn/modules/module.py(1780):__call_impl</text>
+<text x="180.436" y="371" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/nn/modules/module.py(1780):__call_impl (57.4%)</text>
 </g>
 <g>
 <title>models/losses.py(50):_forward (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="344" width="677.005" height="15" fill="#f8ca30" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="355" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">models/losses.py(50):_forward</text>
+<text x="180.436" y="355" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">models/losses.py(50):_forward (57.4%)</text>
 </g>
 <g>
 <title>torch/_dynamo/eval_frame.py(1165):__fn (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="328" width="677.005" height="15" fill="#ee9924" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="339" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_dynamo/eval_frame.py(1165):__fn</text>
+<text x="180.436" y="339" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_dynamo/eval_frame.py(1165):__fn (57.4%)</text>
 </g>
 <g>
 <title>torch/_functorch/aot_autograd.py(1143):_forward (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="312" width="677.005" height="15" fill="#da3c0e" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="323" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/aot_autograd.py(1143):_forward</text>
+<text x="180.436" y="323" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/aot_autograd.py(1143):_forward (57.4%)</text>
 </g>
 <g>
 <title>torch/_functorch/_aot_autograd/runtime_wrappers.py(1961):___call__ (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="296" width="677.005" height="15" fill="#e87d1d" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="307" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_aot_autograd/runtime_wrappers.py(1961):___call__</text>
+<text x="180.436" y="307" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_aot_autograd/runtime_wrappers.py(1961):___call__ (57.4%)</text>
 </g>
 <g>
 <title>torch/_functorch/_aot_autograd/runtime_wrappers.py(313):_runtime_wrapper (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="280" width="677.005" height="15" fill="#d31c06" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="291" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_functorch/_aot_autograd/runtime_wrappers.py(313):_runtime_wrapper</text>
+<text x="180.436" y="291" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_functorch/_aot_autograd/runtime_wrappers.py(313):_runtime_wrapper (57.4%)</text>
 </g>
 <g>
 <title>torch/_functorch/_aot_autograd/utils.py(124):_call_func_at_runtime_with_args (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="264" width="677.005" height="15" fill="#e46d1a" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="275" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_aot_autograd/utils.py(124):_call_func_at_runtime_with_args</text>
+<text x="180.436" y="275" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_aot_autograd/utils.py(124):_call_func_at_runtime_with_args (57.4%)</text>
 </g>
 <g>
 <title>torch/_functorch/_aot_autograd/utils.py(106):_g (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="248" width="677.005" height="15" fill="#dc4610" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="259" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_aot_autograd/utils.py(106):_g</text>
+<text x="180.436" y="259" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_aot_autograd/utils.py(106):_g (57.4%)</text>
 </g>
 <g>
 <title>torch/autograd/function.py(567):_apply (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="232" width="677.005" height="15" fill="#ef9c25" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="243" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/autograd/function.py(567):_apply</text>
+<text x="180.436" y="243" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/autograd/function.py(567):_apply (57.4%)</text>
 </g>
 <g>
 <title>&lt;built-in_method_apply_of_FunctionMeta_object_at_0x14bf68e0&gt; (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="216" width="677.005" height="15" fill="#df5714" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="227" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;built-in_method_apply_of_FunctionMeta_object_at_0x14bf68e0&gt;</text>
+<text x="180.436" y="227" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;built-in_method_apply_of_FunctionMeta_object_at_0x14bf68e0&gt; (57.4%)</text>
 </g>
 <g>
 <title>torch/_functorch/_aot_autograd/runtime_wrappers.py(2116):_forward (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="200" width="677.005" height="15" fill="#ea8820" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="211" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_aot_autograd/runtime_wrappers.py(2116):_forward</text>
+<text x="180.436" y="211" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_aot_autograd/runtime_wrappers.py(2116):_forward (57.4%)</text>
 </g>
 <g>
 <title>torch/_functorch/_aot_autograd/utils.py(124):_call_func_at_runtime_with_args (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="184" width="677.005" height="15" fill="#e46d1a" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="195" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_aot_autograd/utils.py(124):_call_func_at_runtime_with_args</text>
+<text x="180.436" y="195" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_aot_autograd/utils.py(124):_call_func_at_runtime_with_args (57.4%)</text>
 </g>
 <g>
 <title>torch/_functorch/_aot_autograd/runtime_wrappers.py(517):_wrapper (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="168" width="677.005" height="15" fill="#df5614" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="179" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_aot_autograd/runtime_wrappers.py(517):_wrapper</text>
+<text x="180.436" y="179" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_aot_autograd/runtime_wrappers.py(517):_wrapper (57.4%)</text>
 </g>
 <g>
 <title>torch/_inductor/output_code.py(611):___call__ (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="152" width="677.005" height="15" fill="#d8350c" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="163" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_inductor/output_code.py(611):___call__</text>
+<text x="180.436" y="163" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_inductor/output_code.py(611):___call__ (57.4%)</text>
 </g>
 <g>
 <title>torch/_inductor/utils.py(3216):_run (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="136" width="677.005" height="15" fill="#ec8e22" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="147" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_inductor/utils.py(3216):_run</text>
+<text x="180.436" y="147" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_inductor/utils.py(3216):_run (57.4%)</text>
 </g>
 <g>
 <title>/tmp/torchinductor_ayp/am/camw452m4y7ajsnvcrgul6puycsbv4kyc6k37qx5mhvm7j4ufx5c.py(2396):_call (11,611,270 us, 57.37%)</title>
 <rect x="177.436" y="120" width="677.005" height="15" fill="#f4b52b" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.436" y="131" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">/tmp/torchinductor_ayp/am/camw452m4y7ajsnvcrgul6puycsbv4kyc6k37qx5mhvm7j4ufx5c.py(2396)...</text>
+<text x="180.436" y="131" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">/tmp/torchinductor_ayp/am/camw452m4y7ajsnvcrgul6puycsbv4kyc6k37qx5mhvm7j4ufx5c.... (57.4%)</text>
 </g>
 <g>
 <title>&lt;built-in_method_addmm_of_type_object_at_0x7f1869aa9b40&gt; (325 us, 0.00%)</title>
@@ -187,27 +187,27 @@
 <g>
 <title>&lt;built-in_method_mm_of_type_object_at_0x7f1869aa9b40&gt; (4,397,050 us, 21.73%)</title>
 <rect x="177.455" y="104" width="256.374" height="15" fill="#e36718" stroke="#ffffff" stroke-width="0.5"/>
-<text x="180.455" y="115" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;built-in_method_mm_of_type_ob...</text>
+<text x="180.455" y="115" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;built-in_method_mm_of... (21.7%)</text>
 </g>
 <g>
 <title>torch/_inductor/runtime/triton_heuristics.py(1338):_run (6,122,939 us, 30.25%)</title>
 <rect x="433.829" y="104" width="357.003" height="15" fill="#e6731b" stroke="#ffffff" stroke-width="0.5"/>
-<text x="436.829" y="115" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_inductor/runtime/triton_heuristics.py...</text>
+<text x="436.829" y="115" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_inductor/runtime/triton_heuri... (30.3%)</text>
 </g>
 <g>
 <title>&lt;string&gt;(1):_launcher (3,880,943 us, 19.18%)</title>
 <rect x="433.829" y="88" width="226.282" height="15" fill="#f7c32e" stroke="#ffffff" stroke-width="0.5"/>
-<text x="436.829" y="99" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;string&gt;(1):_launcher</text>
+<text x="436.829" y="99" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;string&gt;(1):_launcher (19.2%)</text>
 </g>
 <g>
 <title>torch/_inductor/runtime/static_cuda_launcher.py(229):_run (3,494,030 us, 17.26%)</title>
 <rect x="433.829" y="72" width="203.723" height="15" fill="#db410f" stroke="#ffffff" stroke-width="0.5"/>
-<text x="436.829" y="83" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_inductor/runtime...</text>
+<text x="436.829" y="83" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_inductor... (17.3%)</text>
 </g>
 <g>
 <title>&lt;built-in_function__launch_kernel&gt; (3,103,775 us, 15.34%)</title>
 <rect x="433.829" y="56" width="180.968" height="15" fill="#de4f13" stroke="#ffffff" stroke-width="0.5"/>
-<text x="436.829" y="67" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;built-in_function__...</text>
+<text x="436.829" y="67" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;built-in_fu... (15.3%)</text>
 </g>
 <g>
 <title>torch/_ops.py(818):___call__ (1,090,956 us, 5.39%)</title>
@@ -222,7 +222,7 @@
 <g>
 <title>torch/_tensor.py(575):_backward (2,837,242 us, 14.02%)</title>
 <rect x="854.441" y="440" width="165.428" height="15" fill="#f5b82c" stroke="#ffffff" stroke-width="0.5"/>
-<text x="857.441" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_tensor.py(5...</text>
+<text x="857.441" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_ten... (14.0%)</text>
 </g>
 <g>
 <title>&lt;built-in_method_ones_like_of_type_object_at_0x7f1869aa9b40&gt; (40 us, 0.00%)</title>
@@ -231,57 +231,57 @@
 <g>
 <title>torch/autograd/graph.py(856):__engine_run_backward (2,837,202 us, 14.02%)</title>
 <rect x="854.443" y="424" width="165.426" height="15" fill="#d31f07" stroke="#ffffff" stroke-width="0.5"/>
-<text x="857.443" y="435" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/autograd/gra...</text>
+<text x="857.443" y="435" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/auto... (14.0%)</text>
 </g>
 <g>
 <title>&lt;built-in_method_run_backward_of_torch._C._EngineBase_object_at_0x7f190dd33300&gt; (2,837,202 us, 14.02%)</title>
 <rect x="854.443" y="408" width="165.426" height="15" fill="#dd4a11" stroke="#ffffff" stroke-width="0.5"/>
-<text x="857.443" y="419" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;built-in_method_r...</text>
+<text x="857.443" y="419" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;built-in_... (14.0%)</text>
 </g>
 <g>
 <title>torch/autograd/function.py(302):_apply (2,837,169 us, 14.02%)</title>
 <rect x="854.443" y="392" width="165.424" height="15" fill="#cf0902" stroke="#ffffff" stroke-width="0.5"/>
-<text x="857.443" y="403" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/autograd/fun...</text>
+<text x="857.443" y="403" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/auto... (14.0%)</text>
 </g>
 <g>
 <title>torch/_functorch/_aot_autograd/runtime_wrappers.py(2274):_backward (2,837,169 us, 14.02%)</title>
 <rect x="854.443" y="376" width="165.424" height="15" fill="#ef9f26" stroke="#ffffff" stroke-width="0.5"/>
-<text x="857.443" y="387" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_...</text>
+<text x="857.443" y="387" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_fun... (14.0%)</text>
 </g>
 <g>
 <title>torch/_functorch/_aot_autograd/runtime_wrappers.py(2323):_impl_fn (2,837,169 us, 14.02%)</title>
 <rect x="854.443" y="360" width="165.424" height="15" fill="#e46c1a" stroke="#ffffff" stroke-width="0.5"/>
-<text x="857.443" y="371" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_...</text>
+<text x="857.443" y="371" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_fun... (14.0%)</text>
 </g>
 <g>
 <title>torch/_functorch/_aot_autograd/runtime_wrappers.py(2366):__backward_impl (2,837,169 us, 14.02%)</title>
 <rect x="854.443" y="344" width="165.424" height="15" fill="#f9ce31" stroke="#ffffff" stroke-width="0.5"/>
-<text x="857.443" y="355" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_...</text>
+<text x="857.443" y="355" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_fun... (14.0%)</text>
 </g>
 <g>
 <title>torch/_functorch/_aot_autograd/utils.py(124):_call_func_at_runtime_with_args (2,837,169 us, 14.02%)</title>
 <rect x="854.443" y="328" width="165.424" height="15" fill="#e46d1a" stroke="#ffffff" stroke-width="0.5"/>
-<text x="857.443" y="339" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_...</text>
+<text x="857.443" y="339" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_fun... (14.0%)</text>
 </g>
 <g>
 <title>torch/_dynamo/eval_frame.py(1165):__fn (2,837,169 us, 14.02%)</title>
 <rect x="854.443" y="312" width="165.424" height="15" fill="#ee9924" stroke="#ffffff" stroke-width="0.5"/>
-<text x="857.443" y="323" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_dynamo/eval...</text>
+<text x="857.443" y="323" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_dyn... (14.0%)</text>
 </g>
 <g>
 <title>torch/_inductor/output_code.py(611):___call__ (2,837,169 us, 14.02%)</title>
 <rect x="854.443" y="296" width="165.424" height="15" fill="#d8350c" stroke="#ffffff" stroke-width="0.5"/>
-<text x="857.443" y="307" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_inductor/ou...</text>
+<text x="857.443" y="307" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_ind... (14.0%)</text>
 </g>
 <g>
 <title>torch/_inductor/utils.py(3216):_run (2,837,169 us, 14.02%)</title>
 <rect x="854.443" y="280" width="165.424" height="15" fill="#ec8e22" stroke="#ffffff" stroke-width="0.5"/>
-<text x="857.443" y="291" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_inductor/ut...</text>
+<text x="857.443" y="291" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_ind... (14.0%)</text>
 </g>
 <g>
 <title>/tmp/torchinductor_ayp/tl/ctlr5ivb663qrwxvukvlcvgnafk3klj5d5m7eutkqnxz2y5wzrhh.py(1885):_call (2,837,169 us, 14.02%)</title>
 <rect x="854.443" y="264" width="165.424" height="15" fill="#fcd833" stroke="#ffffff" stroke-width="0.5"/>
-<text x="857.443" y="275" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">/tmp/torchinductor...</text>
+<text x="857.443" y="275" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">/tmp/torch... (14.0%)</text>
 </g>
 <g>
 <title>&lt;built-in_method_mm_of_type_object_at_0x7f1869aa9b40&gt; (1,692,022 us, 8.36%)</title>
@@ -303,12 +303,12 @@
 <g>
 <title>torch/optim/optimizer.py(505):_wrapper (2,917,792 us, 14.42%)</title>
 <rect x="1019.869" y="440" width="170.124" height="15" fill="#ef9f26" stroke="#ffffff" stroke-width="0.5"/>
-<text x="1022.869" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/optim/optimiz...</text>
+<text x="1022.869" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/optim... (14.4%)</text>
 </g>
 <g>
 <title>torch/utils/_contextlib.py(120):_decorate_context (2,917,792 us, 14.42%)</title>
 <rect x="1019.869" y="424" width="170.124" height="15" fill="#ec8f22" stroke="#ffffff" stroke-width="0.5"/>
-<text x="1022.869" y="435" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/utils/_contex...</text>
+<text x="1022.869" y="435" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/utils... (14.4%)</text>
 </g>
 <g>
 <title>adam_atan2_pytorch/adam_atan2.py(50):_step (57,663 us, 0.28%)</title>
@@ -341,12 +341,12 @@
 <g>
 <title>models/sparse_embedding.py(62):_step (2,860,129 us, 14.13%)</title>
 <rect x="1023.231" y="408" width="166.762" height="15" fill="#e9821f" stroke="#ffffff" stroke-width="0.5"/>
-<text x="1026.231" y="419" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">models/sparse_embe...</text>
+<text x="1026.231" y="419" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">models/spa... (14.1%)</text>
 </g>
 <g>
 <title>models/sparse_embedding.py(98):__sparse_emb_signsgd_dist (2,860,129 us, 14.13%)</title>
 <rect x="1023.231" y="392" width="166.762" height="15" fill="#e05915" stroke="#ffffff" stroke-width="0.5"/>
-<text x="1026.231" y="403" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">models/sparse_embe...</text>
+<text x="1026.231" y="403" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">models/spa... (14.1%)</text>
 </g>
 <g>
 <title>&lt;built-in_method_add__of_Tensor_object_at_0x7f1794e33570&gt; (42 us, 0.00%)</title>
@@ -371,31 +371,31 @@
 <g>
 <title>torch/_tensor.py(1073):_unique (2,858,099 us, 14.12%)</title>
 <rect x="1023.314" y="376" width="166.644" height="15" fill="#da400f" stroke="#ffffff" stroke-width="0.5"/>
-<text x="1026.314" y="387" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_tensor.py(1...</text>
+<text x="1026.314" y="387" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_ten... (14.1%)</text>
 </g>
 <g>
 <title>torch/_jit_internal.py(609):_fn (2,858,099 us, 14.12%)</title>
 <rect x="1023.314" y="360" width="166.644" height="15" fill="#dc4610" stroke="#ffffff" stroke-width="0.5"/>
-<text x="1026.314" y="371" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_jit_interna...</text>
+<text x="1026.314" y="371" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_jit... (14.1%)</text>
 </g>
 <g>
 <title>torch/_jit_internal.py(609):_fn (2,858,099 us, 14.12%)</title>
 <rect x="1023.314" y="344" width="166.644" height="15" fill="#dc4610" stroke="#ffffff" stroke-width="0.5"/>
-<text x="1026.314" y="355" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_jit_interna...</text>
+<text x="1026.314" y="355" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_jit... (14.1%)</text>
 </g>
 <g>
 <title>torch/functional.py(1057):__return_inverse (2,858,099 us, 14.12%)</title>
 <rect x="1023.314" y="328" width="166.644" height="15" fill="#db4310" stroke="#ffffff" stroke-width="0.5"/>
-<text x="1026.314" y="339" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/functional.p...</text>
+<text x="1026.314" y="339" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/func... (14.1%)</text>
 </g>
 <g>
 <title>torch/functional.py(786):__unique_impl (2,858,099 us, 14.12%)</title>
 <rect x="1023.314" y="312" width="166.644" height="15" fill="#eb8b21" stroke="#ffffff" stroke-width="0.5"/>
-<text x="1026.314" y="323" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/functional.p...</text>
+<text x="1026.314" y="323" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/func... (14.1%)</text>
 </g>
 <g>
 <title>&lt;built-in_method__unique2_of_type_object_at_0x7f1869aa9b40&gt; (2,858,099 us, 14.12%)</title>
 <rect x="1023.314" y="296" width="166.644" height="15" fill="#ce0802" stroke="#ffffff" stroke-width="0.5"/>
-<text x="1026.314" y="307" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">&lt;built-in_method__...</text>
+<text x="1026.314" y="307" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">&lt;built-in_... (14.1%)</text>
 </g>
 </svg>

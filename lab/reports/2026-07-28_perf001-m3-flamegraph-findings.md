@@ -4,6 +4,7 @@ parent: PERF-001
 status: attribution complete — 후보 제안, 승격 전
 date: 2026-07-28
 scope: "M3 profiler capture의 flame chart 귀속 결과와 Phase 1 후보 제안"
+figqa: cpu=PASS, cuda=REVISE-FIGURE (2026-07-29 → lab/audits/2026-07-29_figqa-m3-flamecharts.md)
 ---
 
 # PERF-001 M3 flame chart — 귀속 결과와 후보 제안
@@ -94,7 +95,13 @@ mask가 그 조건을 정확히 재현한다. **weight decay를 전 row에 적�
 
 `stack`의 프로젝트 호출자는 `pretrain.py(373)`, 즉 매 update의
 `torch.stack([metrics[k] for k in metric_keys])`다. 이는 계획서 Phase 1 후보 1(train logging
-cadence)이 겨냥한 경로와 정확히 일치하며, 이번 flame chart가 그 후보에 **실측 근거**를 준다.
+cadence)이 겨냥한 경로와 정확히 일치하며, §2 표의 수치(실측 근거)가 그 후보를 뒷받침한다.
+
+**fig-qa 게이트 (2026-07-29):** `_cuda.svg` 자체는 REVISE-FIGURE — 독립 blind reader 2명
+(caption 유무 무관) 모두 mm/launch-overhead/unique/stack **3\~4갈래 비등 분할**이라는 의도된
+메시지를 그림만으로 복구하지 못했다(프레임별 수치 라벨 부재가 원인으로 특정됨). 위 §2 표 수치
+자체는 profiler 집계 테이블에서 직접 뽑은 것이라 이 판정과 무관하지만, `_cuda.svg`를 **시각적
+증거로 인용**하는 것은 재렌더+재검증 전까지 보류한다. 상세: `lab/audits/2026-07-29_figqa-m3-flamecharts.md`.
 
 ## 5. F3 — launch/heuristics 오버헤드가 CUDA의 29%
 

@@ -1,0 +1,537 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="644" viewBox="0 0 1200 644" preserveAspectRatio="xMinYMin meet">
+<rect x="0" y="0" width="1200" height="644" fill="#ffffff"/>
+<text x="600" y="26" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#000000">M3 tf/z/iter k=6 s=1 — self_cpu_time_total (contended host)</text>
+<text x="600" y="44" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="11" fill="#555555">self_cpu_time_total  |  total 7,343,650 us  |  121 frames  |  depth 36</text>
+<g>
+<title>all (7,343,650 us, 100.00%)</title>
+<rect x="10" y="616" width="1180" height="15" fill="#df5514" stroke="#ffffff" stroke-width="0.5"/>
+<text x="13" y="627" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">all</text>
+</g>
+<g>
+<title>pretrain.py(877):_&lt;module&gt; (7,343,650 us, 100.00%)</title>
+<rect x="10" y="600" width="1180" height="15" fill="#e9831f" stroke="#ffffff" stroke-width="0.5"/>
+<text x="13" y="611" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">pretrain.py(877):_&lt;module&gt;</text>
+</g>
+<g>
+<title>hydra/main.py(94):_decorated_main (7,343,650 us, 100.00%)</title>
+<rect x="10" y="584" width="1180" height="15" fill="#df5414" stroke="#ffffff" stroke-width="0.5"/>
+<text x="13" y="595" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/main.py(94):_decorated_main</text>
+</g>
+<g>
+<title>hydra/_internal/utils.py(394):__run_hydra (7,343,650 us, 100.00%)</title>
+<rect x="10" y="568" width="1180" height="15" fill="#ce0802" stroke="#ffffff" stroke-width="0.5"/>
+<text x="13" y="579" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">hydra/_internal/utils.py(394):__run_hydra</text>
+</g>
+<g>
+<title>hydra/_internal/utils.py(457):__run_app (7,343,650 us, 100.00%)</title>
+<rect x="10" y="552" width="1180" height="15" fill="#f1a627" stroke="#ffffff" stroke-width="0.5"/>
+<text x="13" y="563" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/_internal/utils.py(457):__run_app</text>
+</g>
+<g>
+<title>hydra/_internal/utils.py(220):_run_and_report (7,343,650 us, 100.00%)</title>
+<rect x="10" y="536" width="1180" height="15" fill="#db410f" stroke="#ffffff" stroke-width="0.5"/>
+<text x="13" y="547" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/_internal/utils.py(220):_run_and_report</text>
+</g>
+<g>
+<title>hydra/_internal/utils.py(458):_&lt;lambda&gt; (7,343,650 us, 100.00%)</title>
+<rect x="10" y="520" width="1180" height="15" fill="#f3b12a" stroke="#ffffff" stroke-width="0.5"/>
+<text x="13" y="531" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/_internal/utils.py(458):_&lt;lambda&gt;</text>
+</g>
+<g>
+<title>hydra/_internal/hydra.py(119):_run (7,343,650 us, 100.00%)</title>
+<rect x="10" y="504" width="1180" height="15" fill="#de4f12" stroke="#ffffff" stroke-width="0.5"/>
+<text x="13" y="515" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/_internal/hydra.py(119):_run</text>
+</g>
+<g>
+<title>hydra/core/utils.py(186):_run_job (7,343,650 us, 100.00%)</title>
+<rect x="10" y="488" width="1180" height="15" fill="#de5113" stroke="#ffffff" stroke-width="0.5"/>
+<text x="13" y="499" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">hydra/core/utils.py(186):_run_job</text>
+</g>
+<g>
+<title>pretrain.py(798):_launch (7,343,650 us, 100.00%)</title>
+<rect x="10" y="472" width="1180" height="15" fill="#e6741b" stroke="#ffffff" stroke-width="0.5"/>
+<text x="13" y="483" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">pretrain.py(798):_launch</text>
+</g>
+<g>
+<title>models/ema.py(16):_update (10,829 us, 0.15%)</title>
+<rect x="10" y="456" width="1.74" height="15" fill="#e05b15" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>pretrain.py(373):_train_batch_profiled (7,284,293 us, 99.19%)</title>
+<rect x="11.74" y="456" width="1170.462" height="15" fill="#d11405" stroke="#ffffff" stroke-width="0.5"/>
+<text x="14.74" y="467" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">pretrain.py(373):_train_batch_profiled</text>
+</g>
+<g>
+<title>&lt;built-in_method_cpu_of_Tensor_object_at_0x7f1794e50640&gt; (710 us, 0.01%)</title>
+<rect x="11.74" y="440" width="0.114" height="15" fill="#ee9a24" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_cuda_of_Tensor_object_at_0x7f1794d31720&gt; (25,818 us, 0.35%)</title>
+<rect x="11.854" y="440" width="4.149" height="15" fill="#e36518" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_numpy_of_Tensor_object_at_0x7f1794e30780&gt; (54 us, 0.00%)</title>
+<rect x="16.003" y="440" width="0.009" height="15" fill="#d01104" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_stack_of_type_object_at_0x7f1869aa9b40&gt; (471,866 us, 6.43%)</title>
+<rect x="16.011" y="440" width="75.821" height="15" fill="#ef9d25" stroke="#ffffff" stroke-width="0.5"/>
+<text x="19.011" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;built...</text>
+</g>
+<g>
+<title>torch/_compile.py(42):_inner (3,050 us, 0.04%)</title>
+<rect x="91.832" y="440" width="0.49" height="15" fill="#f6c02d" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_dynamo/eval_frame.py(1165):__fn (3,050 us, 0.04%)</title>
+<rect x="91.832" y="424" width="0.49" height="15" fill="#ee9924" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/optim/optimizer.py(1019):_zero_grad (3,050 us, 0.04%)</title>
+<rect x="91.832" y="408" width="0.49" height="15" fill="#d11404" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/autograd/profiler.py(800):___enter__ (3,050 us, 0.04%)</title>
+<rect x="91.832" y="392" width="0.49" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_ops.py(1197):___call__ (3,050 us, 0.04%)</title>
+<rect x="91.832" y="376" width="0.49" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method__record_function_enter_new_of_pybind11_builtins.pybind11_detail_function_record_v1_system_libstdcpp_gxx_abi_1xxx_use_cxx11_abi_1_object_at_0x7f177284a830&gt; (3,050 us, 0.04%)</title>
+<rect x="91.832" y="360" width="0.49" height="15" fill="#d42308" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_dynamo/eval_frame.py(453):___call__ (1,046,912 us, 14.26%)</title>
+<rect x="92.322" y="440" width="168.221" height="15" fill="#f0a527" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.322" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_dynamo/eval...</text>
+</g>
+<g>
+<title>nn.Module:_OptimizedModule_0 (1,046,912 us, 14.26%)</title>
+<rect x="92.322" y="424" width="168.221" height="15" fill="#f2ae29" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.322" y="435" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">nn.Module:_Optimiz...</text>
+</g>
+<g>
+<title>torch/nn/modules/module.py(1780):__call_impl (1,046,912 us, 14.26%)</title>
+<rect x="92.322" y="408" width="168.221" height="15" fill="#ce0501" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.322" y="419" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/nn/modules/m...</text>
+</g>
+<g>
+<title>torch/_dynamo/eval_frame.py(904):_compile_wrapper (1,046,912 us, 14.26%)</title>
+<rect x="92.322" y="392" width="168.221" height="15" fill="#d62a0a" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.322" y="403" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_dynamo/eval...</text>
+</g>
+<g>
+<title>nn.Module:_ACTLossHead_0 (1,046,912 us, 14.26%)</title>
+<rect x="92.322" y="376" width="168.221" height="15" fill="#e46e1a" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.322" y="387" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">nn.Module:_ACTLoss...</text>
+</g>
+<g>
+<title>torch/nn/modules/module.py(1780):__call_impl (1,046,912 us, 14.26%)</title>
+<rect x="92.322" y="360" width="168.221" height="15" fill="#ce0501" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.322" y="371" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/nn/modules/m...</text>
+</g>
+<g>
+<title>models/losses.py(50):_forward (1,042,698 us, 14.20%)</title>
+<rect x="92.322" y="344" width="167.544" height="15" fill="#f8ca30" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.322" y="355" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">models/losses.py(5...</text>
+</g>
+<g>
+<title>torch/_compile.py(42):_inner (275 us, 0.00%)</title>
+<rect x="92.322" y="328" width="0.044" height="15" fill="#f6c02d" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_dynamo/eval_frame.py(1165):__fn (275 us, 0.00%)</title>
+<rect x="92.322" y="312" width="0.044" height="15" fill="#ee9924" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_dynamo/utils.py(4979):_record_pregraph_bytecode_enter (275 us, 0.00%)</title>
+<rect x="92.322" y="296" width="0.044" height="15" fill="#e6731b" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method___enter___of_torch._C._profiler.RecordFunctionFast_object_at_0x7f17952b6e80&gt; (275 us, 0.00%)</title>
+<rect x="92.322" y="280" width="0.044" height="15" fill="#dc4911" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_dynamo/eval_frame.py(1165):__fn (1,042,423 us, 14.19%)</title>
+<rect x="92.366" y="328" width="167.5" height="15" fill="#ee9924" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.366" y="339" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_dynamo/eval...</text>
+</g>
+<g>
+<title>torch/_functorch/aot_autograd.py(1143):_forward (1,042,423 us, 14.19%)</title>
+<rect x="92.366" y="312" width="167.5" height="15" fill="#da3c0e" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.366" y="323" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/a...</text>
+</g>
+<g>
+<title>torch/_functorch/_aot_autograd/runtime_wrappers.py(1961):___call__ (1,042,423 us, 14.19%)</title>
+<rect x="92.366" y="296" width="167.5" height="15" fill="#e87d1d" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.366" y="307" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_...</text>
+</g>
+<g>
+<title>torch/_functorch/_aot_autograd/runtime_wrappers.py(313):_runtime_wrapper (1,042,423 us, 14.19%)</title>
+<rect x="92.366" y="280" width="167.5" height="15" fill="#d31c06" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.366" y="291" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_functorch/_...</text>
+</g>
+<g>
+<title>torch/_functorch/_aot_autograd/runtime_wrappers.py(293):_record_runtime_wrapper_prologue_enter (426 us, 0.01%)</title>
+<rect x="92.366" y="264" width="0.068" height="15" fill="#e7781c" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method___enter___of_torch._C._profiler.RecordFunctionFast_object_at_0x7f17952b6e80&gt; (426 us, 0.01%)</title>
+<rect x="92.366" y="248" width="0.068" height="15" fill="#dc4911" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_functorch/_aot_autograd/utils.py(124):_call_func_at_runtime_with_args (1,041,997 us, 14.19%)</title>
+<rect x="92.435" y="264" width="167.431" height="15" fill="#e46d1a" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.435" y="275" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_...</text>
+</g>
+<g>
+<title>torch/_functorch/_aot_autograd/utils.py(106):_g (1,041,997 us, 14.19%)</title>
+<rect x="92.435" y="248" width="167.431" height="15" fill="#dc4610" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.435" y="259" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_...</text>
+</g>
+<g>
+<title>torch/autograd/function.py(567):_apply (1,041,997 us, 14.19%)</title>
+<rect x="92.435" y="232" width="167.431" height="15" fill="#ef9c25" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.435" y="243" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/autograd/fun...</text>
+</g>
+<g>
+<title>&lt;built-in_method_apply_of_FunctionMeta_object_at_0x14bf68e0&gt; (1,041,997 us, 14.19%)</title>
+<rect x="92.435" y="216" width="167.431" height="15" fill="#df5714" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.435" y="227" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;built-in_method_a...</text>
+</g>
+<g>
+<title>torch/_functorch/_aot_autograd/runtime_wrappers.py(2116):_forward (1,031,829 us, 14.05%)</title>
+<rect x="92.435" y="200" width="165.797" height="15" fill="#ea8820" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.435" y="211" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_...</text>
+</g>
+<g>
+<title>torch/_functorch/_aot_autograd/utils.py(124):_call_func_at_runtime_with_args (1,031,829 us, 14.05%)</title>
+<rect x="92.435" y="184" width="165.797" height="15" fill="#e46d1a" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.435" y="195" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_...</text>
+</g>
+<g>
+<title>torch/_functorch/_aot_autograd/runtime_wrappers.py(517):_wrapper (1,031,829 us, 14.05%)</title>
+<rect x="92.435" y="168" width="165.797" height="15" fill="#df5614" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.435" y="179" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_functorch/_...</text>
+</g>
+<g>
+<title>torch/_inductor/output_code.py(611):___call__ (1,031,829 us, 14.05%)</title>
+<rect x="92.435" y="152" width="165.797" height="15" fill="#d8350c" stroke="#ffffff" stroke-width="0.5"/>
+<text x="95.435" y="163" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_inductor/ou...</text>
+</g>
+<g>
+<title>torch/_inductor/utils.py(3216):_run (221,027 us, 3.01%)</title>
+<rect x="92.435" y="136" width="35.515" height="15" fill="#ec8e22" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>/tmp/torchinductor_ayp/am/camw452m4y7ajsnvcrgul6puycsbv4kyc6k37qx5mhvm7j4ufx5c.py(2396):_call (221,027 us, 3.01%)</title>
+<rect x="92.435" y="120" width="35.515" height="15" fill="#f4b52b" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_addmm_of_type_object_at_0x7f1869aa9b40&gt; (827 us, 0.01%)</title>
+<rect x="92.435" y="104" width="0.133" height="15" fill="#e9831f" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_mm_of_type_object_at_0x7f1869aa9b40&gt; (76,204 us, 1.04%)</title>
+<rect x="92.568" y="104" width="12.245" height="15" fill="#e36718" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_inductor/runtime/triton_heuristics.py(1338):_run (81,481 us, 1.11%)</title>
+<rect x="104.812" y="104" width="13.093" height="15" fill="#e6731b" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;string&gt;(1):_launcher (3,722 us, 0.05%)</title>
+<rect x="104.812" y="88" width="0.598" height="15" fill="#f7c32e" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_inductor/runtime/static_cuda_launcher.py(229):_run (3,722 us, 0.05%)</title>
+<rect x="104.812" y="72" width="0.598" height="15" fill="#db410f" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_function__launch_kernel&gt; (3,722 us, 0.05%)</title>
+<rect x="104.812" y="56" width="0.598" height="15" fill="#de4f13" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_ops.py(818):___call__ (62,018 us, 0.84%)</title>
+<rect x="117.905" y="104" width="9.965" height="15" fill="#d00d03" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method__of_pybind11_builtins.pybind11_detail_function_record_v1_system_libstdcpp_gxx_abi_1xxx_use_cxx11_abi_1_object_at_0x7f17713dd550&gt; (62,018 us, 0.84%)</title>
+<rect x="117.905" y="88" width="9.965" height="15" fill="#ea8720" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/autograd/profiler.py(800):___enter__ (810,802 us, 11.04%)</title>
+<rect x="127.95" y="136" width="130.282" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+<text x="130.95" y="147" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/autogra...</text>
+</g>
+<g>
+<title>torch/_ops.py(1197):___call__ (810,802 us, 11.04%)</title>
+<rect x="127.95" y="120" width="130.282" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+<text x="130.95" y="131" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_ops.py...</text>
+</g>
+<g>
+<title>&lt;built-in_method__record_function_enter_new_of_pybind11_builtins.pybind11_detail_function_record_v1_system_libstdcpp_gxx_abi_1xxx_use_cxx11_abi_1_object_at_0x7f177284a830&gt; (810,802 us, 11.04%)</title>
+<rect x="127.95" y="104" width="130.282" height="15" fill="#d42308" stroke="#ffffff" stroke-width="0.5"/>
+<text x="130.95" y="115" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">&lt;built-in_met...</text>
+</g>
+<g>
+<title>torch/_tensor.py(575):_backward (6,361 us, 0.09%)</title>
+<rect x="260.543" y="440" width="1.022" height="15" fill="#f5b82c" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_ones_like_of_type_object_at_0x7f1869aa9b40&gt; (473 us, 0.01%)</title>
+<rect x="260.543" y="424" width="0.076" height="15" fill="#d11304" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/autograd/graph.py(856):__engine_run_backward (5,888 us, 0.08%)</title>
+<rect x="260.619" y="424" width="0.946" height="15" fill="#d31f07" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_run_backward_of_torch._C._EngineBase_object_at_0x7f190dd33300&gt; (5,888 us, 0.08%)</title>
+<rect x="260.619" y="408" width="0.946" height="15" fill="#dd4a11" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/autograd/profiler.py(800):___enter__ (524,952 us, 7.15%)</title>
+<rect x="261.565" y="440" width="84.351" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+<text x="264.565" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/a...</text>
+</g>
+<g>
+<title>torch/_ops.py(1197):___call__ (524,952 us, 7.15%)</title>
+<rect x="261.565" y="424" width="84.351" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+<text x="264.565" y="435" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_...</text>
+</g>
+<g>
+<title>&lt;built-in_method__record_function_enter_new_of_pybind11_builtins.pybind11_detail_function_record_v1_system_libstdcpp_gxx_abi_1xxx_use_cxx11_abi_1_object_at_0x7f177284a830&gt; (524,952 us, 7.15%)</title>
+<rect x="261.565" y="408" width="84.351" height="15" fill="#d42308" stroke="#ffffff" stroke-width="0.5"/>
+<text x="264.565" y="419" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">&lt;built-...</text>
+</g>
+<g>
+<title>torch/optim/optimizer.py(505):_wrapper (5,201,755 us, 70.83%)</title>
+<rect x="345.916" y="440" width="835.834" height="15" fill="#ef9f26" stroke="#ffffff" stroke-width="0.5"/>
+<text x="348.916" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/optim/optimizer.py(505):_wrapper</text>
+</g>
+<g>
+<title>torch/autograd/profiler.py(800):___enter__ (20,599 us, 0.28%)</title>
+<rect x="345.916" y="424" width="3.31" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_ops.py(1197):___call__ (20,599 us, 0.28%)</title>
+<rect x="345.916" y="408" width="3.31" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method__record_function_enter_new_of_pybind11_builtins.pybind11_detail_function_record_v1_system_libstdcpp_gxx_abi_1xxx_use_cxx11_abi_1_object_at_0x7f177284a830&gt; (20,599 us, 0.28%)</title>
+<rect x="345.916" y="392" width="3.31" height="15" fill="#d42308" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/utils/_contextlib.py(120):_decorate_context (5,181,156 us, 70.55%)</title>
+<rect x="349.226" y="424" width="832.524" height="15" fill="#ec8f22" stroke="#ffffff" stroke-width="0.5"/>
+<text x="352.226" y="435" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/utils/_contextlib.py(120):_decorate_context</text>
+</g>
+<g>
+<title>adam_atan2_pytorch/adam_atan2.py(50):_step (25,980 us, 0.35%)</title>
+<rect x="349.226" y="408" width="4.175" height="15" fill="#dd4a11" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_add__of_Tensor_object_at_0x7f1794e33570&gt; (5,936 us, 0.08%)</title>
+<rect x="349.226" y="392" width="0.954" height="15" fill="#d93a0d" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_atan2__of_Tensor_object_at_0x7f1794e321c0&gt; (2,019 us, 0.03%)</title>
+<rect x="350.18" y="392" width="0.324" height="15" fill="#d42308" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_lerp__of_Tensor_object_at_0x7f17950ebfc0&gt; (4,298 us, 0.06%)</title>
+<rect x="350.504" y="392" width="0.691" height="15" fill="#e9811f" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_mul__of_Tensor_object_at_0x7f1794e33570&gt; (2,893 us, 0.04%)</title>
+<rect x="351.195" y="392" width="0.465" height="15" fill="#db400f" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_mul_of_Tensor_object_at_0x7f17950ea580&gt; (5,658 us, 0.08%)</title>
+<rect x="351.66" y="392" width="0.909" height="15" fill="#de5013" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_sqrt__of_Tensor_object_at_0x7f1794e324e0&gt; (1,925 us, 0.03%)</title>
+<rect x="352.569" y="392" width="0.309" height="15" fill="#e9831f" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>models/sparse_embedding.py(62):_step (5,155,176 us, 70.20%)</title>
+<rect x="353.401" y="408" width="828.349" height="15" fill="#e9821f" stroke="#ffffff" stroke-width="0.5"/>
+<text x="356.401" y="419" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">models/sparse_embedding.py(62):_step</text>
+</g>
+<g>
+<title>models/sparse_embedding.py(98):__sparse_emb_signsgd_dist (5,155,176 us, 70.20%)</title>
+<rect x="353.401" y="392" width="828.349" height="15" fill="#e05915" stroke="#ffffff" stroke-width="0.5"/>
+<text x="356.401" y="403" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">models/sparse_embedding.py(98):__sparse_emb_signsgd_dist</text>
+</g>
+<g>
+<title>&lt;built-in_method_add__of_Tensor_object_at_0x7f1794e33570&gt; (249 us, 0.00%)</title>
+<rect x="353.401" y="376" width="0.04" height="15" fill="#d93a0d" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_expand_of_Tensor_object_at_0x7f1794e31ef0&gt; (142 us, 0.00%)</title>
+<rect x="353.441" y="376" width="0.023" height="15" fill="#f1a728" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_mul__of_Tensor_object_at_0x7f1794e33570&gt; (296 us, 0.00%)</title>
+<rect x="353.464" y="376" width="0.048" height="15" fill="#db400f" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_scatter_add__of_Tensor_object_at_0x7f1794e32a30&gt; (632 us, 0.01%)</title>
+<rect x="353.511" y="376" width="0.102" height="15" fill="#f1a928" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_sign_of_type_object_at_0x7f1869aa9b40&gt; (343 us, 0.00%)</title>
+<rect x="353.613" y="376" width="0.055" height="15" fill="#ed9523" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_unsqueeze_of_Tensor_object_at_0x7f1794e32df0&gt; (166 us, 0.00%)</title>
+<rect x="353.668" y="376" width="0.027" height="15" fill="#ee9a24" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method_zeros_of_type_object_at_0x7f1869aa9b40&gt; (839 us, 0.01%)</title>
+<rect x="353.694" y="376" width="0.135" height="15" fill="#f6c12e" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_tensor.py(1073):_unique (5,150,106 us, 70.13%)</title>
+<rect x="353.829" y="376" width="827.535" height="15" fill="#da400f" stroke="#ffffff" stroke-width="0.5"/>
+<text x="356.829" y="387" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_tensor.py(1073):_unique</text>
+</g>
+<g>
+<title>torch/_jit_internal.py(609):_fn (5,150,106 us, 70.13%)</title>
+<rect x="353.829" y="360" width="827.535" height="15" fill="#dc4610" stroke="#ffffff" stroke-width="0.5"/>
+<text x="356.829" y="371" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_jit_internal.py(609):_fn</text>
+</g>
+<g>
+<title>torch/_jit_internal.py(609):_fn (5,150,106 us, 70.13%)</title>
+<rect x="353.829" y="344" width="827.535" height="15" fill="#dc4610" stroke="#ffffff" stroke-width="0.5"/>
+<text x="356.829" y="355" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/_jit_internal.py(609):_fn</text>
+</g>
+<g>
+<title>torch/functional.py(1057):__return_inverse (5,150,106 us, 70.13%)</title>
+<rect x="353.829" y="328" width="827.535" height="15" fill="#db4310" stroke="#ffffff" stroke-width="0.5"/>
+<text x="356.829" y="339" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/functional.py(1057):__return_inverse</text>
+</g>
+<g>
+<title>torch/functional.py(786):__unique_impl (5,150,106 us, 70.13%)</title>
+<rect x="353.829" y="312" width="827.535" height="15" fill="#eb8b21" stroke="#ffffff" stroke-width="0.5"/>
+<text x="356.829" y="323" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/functional.py(786):__unique_impl</text>
+</g>
+<g>
+<title>&lt;built-in_method__unique2_of_type_object_at_0x7f1869aa9b40&gt; (5,150,106 us, 70.13%)</title>
+<rect x="353.829" y="296" width="827.535" height="15" fill="#ce0802" stroke="#ffffff" stroke-width="0.5"/>
+<text x="356.829" y="307" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">&lt;built-in_method__unique2_of_type_object_at_0x7f1869aa9b40&gt;</text>
+</g>
+<g>
+<title>pretrain.py(462):_profiled_train_batches (3,045 us, 0.04%)</title>
+<rect x="1182.202" y="456" width="0.489" height="15" fill="#da3b0e" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_function_next&gt; (1,904 us, 0.03%)</title>
+<rect x="1182.202" y="440" width="0.306" height="15" fill="#e87f1e" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/utils/data/dataloader.py(736):___next__ (1,904 us, 0.03%)</title>
+<rect x="1182.202" y="424" width="0.306" height="15" fill="#d31e07" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/autograd/profiler.py(800):___enter__ (1,904 us, 0.03%)</title>
+<rect x="1182.202" y="408" width="0.306" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_ops.py(1197):___call__ (1,904 us, 0.03%)</title>
+<rect x="1182.202" y="392" width="0.306" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method__record_function_enter_new_of_pybind11_builtins.pybind11_detail_function_record_v1_system_libstdcpp_gxx_abi_1xxx_use_cxx11_abi_1_object_at_0x7f177284a830&gt; (1,904 us, 0.03%)</title>
+<rect x="1182.202" y="376" width="0.306" height="15" fill="#d42308" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/autograd/profiler.py(800):___enter__ (1,141 us, 0.02%)</title>
+<rect x="1182.508" y="440" width="0.183" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_ops.py(1197):___call__ (1,141 us, 0.02%)</title>
+<rect x="1182.508" y="424" width="0.183" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method__record_function_enter_new_of_pybind11_builtins.pybind11_detail_function_record_v1_system_libstdcpp_gxx_abi_1xxx_use_cxx11_abi_1_object_at_0x7f177284a830&gt; (1,141 us, 0.02%)</title>
+<rect x="1182.508" y="408" width="0.183" height="15" fill="#d42308" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/autograd/profiler.py(800):___enter__ (32,200 us, 0.44%)</title>
+<rect x="1182.692" y="456" width="5.174" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_ops.py(1197):___call__ (32,200 us, 0.44%)</title>
+<rect x="1182.692" y="440" width="5.174" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method__record_function_enter_new_of_pybind11_builtins.pybind11_detail_function_record_v1_system_libstdcpp_gxx_abi_1xxx_use_cxx11_abi_1_object_at_0x7f177284a830&gt; (32,200 us, 0.44%)</title>
+<rect x="1182.692" y="424" width="5.174" height="15" fill="#d42308" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>utils/perf_profiler.py(263):_step (12,493 us, 0.17%)</title>
+<rect x="1187.866" y="456" width="2.007" height="15" fill="#fcdb34" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/profiler/profiler.py(872):_step (12,493 us, 0.17%)</title>
+<rect x="1187.866" y="440" width="2.007" height="15" fill="#ef9d25" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/autograd/profiler.py(800):___enter__ (12,485 us, 0.17%)</title>
+<rect x="1187.866" y="424" width="2.006" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_ops.py(1197):___call__ (12,485 us, 0.17%)</title>
+<rect x="1187.866" y="408" width="2.006" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method__record_function_enter_new_of_pybind11_builtins.pybind11_detail_function_record_v1_system_libstdcpp_gxx_abi_1xxx_use_cxx11_abi_1_object_at_0x7f177284a830&gt; (12,485 us, 0.17%)</title>
+<rect x="1187.866" y="392" width="2.006" height="15" fill="#d42308" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/profiler/profiler.py(912):__transit_action (8 us, 0.00%)</title>
+<rect x="1189.872" y="424" width="0.001" height="15" fill="#ed9323" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/profiler/profiler.py(271):_stop_trace (8 us, 0.00%)</title>
+<rect x="1189.872" y="408" width="0.001" height="15" fill="#ec8e22" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/autograd/profiler.py(386):___exit__ (8 us, 0.00%)</title>
+<rect x="1189.872" y="392" width="0.001" height="15" fill="#e05a15" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/cuda/__init__.py(1098):_synchronize (8 us, 0.00%)</title>
+<rect x="1189.872" y="376" width="0.001" height="15" fill="#d42007" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_function__cuda_synchronize&gt; (8 us, 0.00%)</title>
+<rect x="1189.872" y="360" width="0.001" height="15" fill="#e5721b" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>utils/perf_profiler.py(266):_step (790 us, 0.01%)</title>
+<rect x="1189.873" y="456" width="0.127" height="15" fill="#f7c22e" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/profiler/profiler.py(882):_step (790 us, 0.01%)</title>
+<rect x="1189.873" y="440" width="0.127" height="15" fill="#fee436" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/autograd/profiler.py(800):___enter__ (790 us, 0.01%)</title>
+<rect x="1189.873" y="424" width="0.127" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>torch/_ops.py(1197):___call__ (790 us, 0.01%)</title>
+<rect x="1189.873" y="408" width="0.127" height="15" fill="#cf0d03" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+<g>
+<title>&lt;built-in_method__record_function_enter_new_of_pybind11_builtins.pybind11_detail_function_record_v1_system_libstdcpp_gxx_abi_1xxx_use_cxx11_abi_1_object_at_0x7f177284a830&gt; (790 us, 0.01%)</title>
+<rect x="1189.873" y="392" width="0.127" height="15" fill="#d42308" stroke="#ffffff" stroke-width="0.5"/>
+</g>
+</svg>

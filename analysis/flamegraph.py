@@ -40,6 +40,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import math
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -56,6 +57,7 @@ __all__ = [
     "layout",
     "render_svg",
     "render_folded_text",
+    "display_name",
     "frame_color",
     "text_color_for",
     "metric_from_filename",
@@ -173,6 +175,14 @@ class Frame:
     height: float
     value: float
     ratio: float
+    #: True for a frame that does zero work of its own and forwards its entire
+    #: inclusive value to a single child (self_value == 0, exactly one child).
+    #: Its on-frame percentage is then numerically identical to that child's --
+    #: fig-qa 2026-07-29 round 2: printing it anyway makes the SAME number repeat
+    #: on every link of a long pass-through chain, and two independent blind
+    #: readers anchored their main claim on that repeated figure instead of the
+    #: real (comparably-sized, multi-way) split one level deeper. See render_svg.
+    is_passthrough: bool = False
 
 
 # --- parsing ---------------------------------------------------------------
@@ -348,6 +358,7 @@ def layout(root: FrameNode, *, width: int = DEFAULT_WIDTH) -> Tuple[List[Frame],
                 height=FRAME_HEIGHT,
                 value=node.total,
                 ratio=node.total / total,
+                is_passthrough=len(node.children) == 1 and node.self_value == 0,
             )
         )
         # Children are laid out left-to-right alphabetically starting at the
@@ -375,6 +386,7 @@ def layout(root: FrameNode, *, width: int = DEFAULT_WIDTH) -> Tuple[List[Frame],
             height=f.height,
             value=f.value,
             ratio=f.ratio,
+            is_passthrough=f.is_passthrough,
         )
         for f in frames
     ]
@@ -459,6 +471,36 @@ def fit_label(name: str, box_width: float, *, font_size: float = FONT_SIZE) -> O
     if chars < MIN_TRUNCATED_LABEL_CHARS:
         return None
     return name[: chars - 3] + "..."
+
+
+_BUILTIN_METHOD_RE = re.compile(
+    r"^<built-in[ _]method[ _](.+?)[ _]of[ _]type[ _]object[ _]at[ _]0x[0-9a-fA-F]+>$"
+)
+_BUILTIN_FUNCTION_RE = re.compile(r"^<built-in[ _]function[ _](.+)>$")
+
+
+def display_name(name: str) -> str:
+    """Strip torch/pybind builtin-repr boilerplate from a frame's *label* only.
+
+    ``<built-in method mm of type object at 0x7f...>`` truncates, under a plain
+    character budget, to ``<built-in method m...`` -- the hex address and "of
+    type object at" filler consume the box before the one word that actually
+    identifies the frame (``mm``, ``stack``, ``_unique2``) ever appears.
+    fig-qa 2026-07-29 round 2: a caption-informed reader looking specifically
+    for a ``torch.stack`` frame could not find it in the rendered label for
+    exactly this reason, even though it was on the chart at 13.35%. torch's
+    own exporter writes spaces as underscores in these reprs (real captures),
+    but the pattern accepts either, matching what ``parse_folded`` accepts on
+    input. The tooltip and colour hash keep the raw ``name`` untouched -- this
+    only changes what gets truncated for the on-frame text.
+    """
+    m = _BUILTIN_METHOD_RE.match(name)
+    if m:
+        return m.group(1)
+    m = _BUILTIN_FUNCTION_RE.match(name)
+    if m:
+        return m.group(1)
+    return name
 
 
 def _format_value(value: float) -> str:
@@ -589,21 +631,35 @@ def render_svg(
             f'fill="{fill}" stroke="{FRAME_STROKE}" '
             f'stroke-width="0.5"/>'
         )
+        display = display_name(frame.name)
         label = None
         if frame.ratio >= MIN_LABEL_RATIO:
-            # An on-frame number lets a reader rank same-looking siblings without
-            # decoding relative box widths by eye (fig-qa 2026-07-29: two
-            # independent blind readers of a close multi-way split could not do
-            # this from width alone). The real torch frame names here are long
-            # repr strings ("<built-in method mm of type object at 0x...>"), so
-            # reserving room for the suffix *first* and truncating the name
-            # around it -- rather than trying the whole "name (pct%)" and giving
-            # up if it doesn't fit -- is what actually gets the percentage drawn
-            # on the frames fig-qa flagged, not just on short-named ones.
-            suffix = f" ({pct:.1f}%)"
-            reserved_width = len(suffix) * FONT_SIZE * CHAR_WIDTH_RATIO
-            name_part = fit_label(frame.name, frame.width - reserved_width)
-            label = f"{name_part}{suffix}" if name_part else fit_label(frame.name, frame.width)
+            if frame.is_passthrough:
+                # A pure pass-through frame (no self time, exactly one child)
+                # shows the SAME inclusive percentage its child does -- the
+                # number is not wrong, just redundant. fig-qa 2026-07-29 round
+                # 2: printing it anyway meant a long chain of these repeated
+                # the same figure on ~8 consecutive stacked frames, and two
+                # independent blind readers anchored their main claim on that
+                # repeated number instead of the real multi-way split one
+                # level deeper. Name only, no suffix, for these.
+                label = fit_label(display, frame.width)
+            else:
+                # An on-frame number lets a reader rank same-looking siblings
+                # without decoding relative box widths by eye (fig-qa
+                # 2026-07-29: two independent blind readers of a close
+                # multi-way split could not do this from width alone). The
+                # real torch frame names here are long repr strings
+                # ("<built-in method mm of type object at 0x...>"), so
+                # reserving room for the suffix *first* and truncating the
+                # (boilerplate-stripped) name around it -- rather than trying
+                # the whole "name (pct%)" and giving up if it doesn't fit --
+                # is what actually gets the percentage drawn on the frames
+                # fig-qa flagged, not just on short-named ones.
+                suffix = f" ({pct:.1f}%)"
+                reserved_width = len(suffix) * FONT_SIZE * CHAR_WIDTH_RATIO
+                name_part = fit_label(display, frame.width - reserved_width)
+                label = f"{name_part}{suffix}" if name_part else fit_label(display, frame.width)
         if label:
             out.append(
                 f'<text x="{_num(frame.x + FRAME_TEXT_PAD)}" '

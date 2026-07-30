@@ -129,7 +129,7 @@ named frames of interest.
   blocks is bigger" unreliable by design. Works fine for Fig A (one branch overwhelmingly dominates);
   breaks exactly the claim Fig B exists to make. Primary argument for REVISE-FIGURE over REVISE-CAPTION.
 
-## Route
+## Round 1 route (superseded — see Round 3 for final verdict)
 
 - Figure A: **PASS** — citable as evidence for F1 as-is.
 - Figure B: **REVISE-FIGURE** — do not cite as visual evidence for F2/F3's mm/launch/unique/stack
@@ -137,9 +137,125 @@ named frames of interest.
   a fresh B panel (loop cap 2, per skill). The report's F2/F3 **numeric** claims (§2 table: mm 30.09%,
   `_launch_kernel` 15.34%, `triton_heuristics._run` 13.79%, `unique2` 14.12%, `stack` 13.35%) are drawn
   directly from the profiler's aggregate table, not from the flame-chart SVG, and are unaffected by this
-  verdict — only the *chart-as-visual-evidence* citation is gated.
+  verdict — only the *chart-as-visual-evidence* citation was gated (now resolved, Round 3).
+
+---
+
+## Round 2 (revision 1 of 2) — Figure B only
+
+Fix applied to `analysis/flamegraph.py`: on-frame labels now try `"name (pct%)"` first, reserving room
+for the `(pct%)` suffix *before* truncating the name (previously the whole annotated string was tried
+and dropped entirely if it didn't fit, which meant the percentage only ever appeared on short-named
+frames — useless here, since the flagged frames carry long torch repr names). Both `_cpu.svg` and
+`_cuda.svg` re-rendered and re-copied to both `reports/figures/` and `lab/figures/`; renderer check
+re-run (cairosvg, non-flattened). New tests added to `tests/test_flamegraph.py` for the suffix-reservation
+behaviour; one pre-existing test updated (`test_long_names_are_truncated...` — the ellipsis no longer
+sits at the very end of the string once a suffix follows it).
+
+Fresh 3-agent B panel (B1/B2/B3, all newly spawned — prior interpreters are contaminated) + fresh grader,
+against the same sealed FIGSPEC as Round 1.
+
+**Verdict: REVISE-FIGURE again.** R2 (encoding) went to 2/2/2 across all three readers — the suffix fix
+fully solved the original problem (nobody failed to decode color/order/inclusive-share semantics this
+round). But R1 (message recovery) still failed for 2 of 3 readers: **both Sonnet readers organized their
+MAIN CLAIM around a repeated `57.4%` figure that appeared identically on ~8 consecutive stacked
+pass-through/ancestor frames**, instead of recognizing the real four-way leaf split one level deeper in
+the stack. Grader's diagnosis: this is a *new, second-order figure defect* introduced by the same
+mechanism that fixed R2 — uniform percentage-labeling of every frame, including pure single-child
+pass-through links, makes an identical, prominent numeral repeat across many stacked boxes, and a reader
+building a "main claim" naturally reaches for the most repeated/largest labeled number on the chart. I
+independently checked the grader's `torch.stack`-not-locatable concern against the raw folded-stack file
+(`stacks_self_cuda_time_total.txt`): the leaf genuinely exists (`<built-in method stack of type object at
+0x...>`, 13.35%) — not a data gap. The real cause is a *third* defect: truncation-from-the-right keeps the
+`<built-in method ` prefix and cuts before the operation name (`stack`, `mm`, `_unique2`) ever appears,
+since torch's own repr puts the boilerplate first and the identifying word in the middle.
+
+Grader's proposed fixes for Round 3 (both applied, see below): (a) suppress the `(pct%)` suffix on pure
+pass-through frames (single child, zero self-time) — only branch points and leaves keep one; (b) strip
+the `<built-in method X of type object at 0x...>` / `<built-in function X>` boilerplate from the on-frame
+*label only* (tooltip and colour hash keep the raw name) before truncating, so the operation name survives
+the character budget instead of the hex address eating it.
+
+---
+
+## Round 3 (revision 2 of 2 — final, loop cap reached) — Figure B only
+
+Both Round-2 fixes implemented in `analysis/flamegraph.py`: `Frame` gained an `is_passthrough` field
+(`len(node.children) == 1 and node.self_value == 0`, computed in `layout()`); pass-through frames render
+name-only (no suffix). New `display_name()` strips the builtin-repr boilerplate via regex (tolerant of
+both the space- and underscore-separated conventions — torch's own `export_stacks` writes internal spaces
+as underscores in real captures, but `parse_folded` also accepts literal spaces on input, so both had to
+match). 8 new/updated tests in `tests/test_flamegraph.py` (63 total, all passing). Re-rendered, re-copied,
+renderer-checked (non-flattened) as before. Effect on the real chart: the repeated `57.4%` now appears
+**once** (down from ~8), and `stack`, `_launch_kernel`, `_unique2`, and both `mm` occurrences all render
+cleanly with their percentage, none truncated below legibility.
+
+Fresh 3-agent B panel + fresh grader, same sealed FIGSPEC (with an added `known_note_for_grader` flagging
+a suspected caption/data mismatch — see below).
+
+**Score table (0–2):**
+
+| Interpreter | R1 msg recovery | R2 encoding | R3 misreading | R4 self-contained | R5 overclaim | Total |
+|---|---|---|---|---|---|---|
+| B1 (image only) | 0 | 2 | 2 | 2 | 0 | 6/10 |
+| B2 (image+caption, shipping) | 2 | 2 | 2 | 2 | 2 | **10/10** |
+| B3 (Haiku, rushed) | 1 | 2 | 1 | 0 | 1 | 5/10 |
+
+**Did the Round 2 fixes work?** Yes, both, cleanly. No reader reported the repeated-57.4%-on-8-frames
+confusion from Round 1; `stack` was correctly and unprompted located by B1 (no caption) and confirmed by
+B2. R2 (encoding) stayed 2/2/2 — nothing regressed.
+
+**Residual issue (not a defect the Round-2 fix class could address):** B1 (no-caption condition) still
+headlined the largest single *branch-point* percentage (`57.4%`, the torchinductor-generated-kernel
+subtree — legitimately a branch point, correctly kept its label) as "by far the largest single labeled
+contributor," ranking it above the four-way leaf split rather than alongside it — a narrower recurrence
+of the same KF4 trap (one honest node instead of eight repeated ghosts, but the same underlying
+inferential error: an untutored reader gravitates to the single biggest on-frame number as "the answer,"
+without a caption steering them). This is a structural property of inclusive-percentage flame charts, not
+a boilerplate/repeat-suppression bug — suppressing this node's label too would hide genuinely correct
+branch-point information, so it is not a targeted fix the way Round 2's two changes were.
+
+**Genuine, independently-found caption defect (not a chart defect):** B2 flagged that the caption's
+"reading the widest ... branches from left to right: kernel-launch/heuristics, matmul, unique, stack"
+does not match the actual layout — alphabetical sibling order puts a `stack` frame **leftmost**, not last,
+directly contradicting the caption's claimed order. This is a real caption bug, independently rediscovered
+by a blind reader with no coaching, and is fixed here (see below) — it does not require touching the
+render and does not consume a chart-revision round.
+
+**B3's failures (mm misread as "rm"; could not locate the cleanly-labeled `stack`) are attributed to
+rushed-reader conditions, not the figure** — both labels were correctly and easily read by both Sonnet
+conditions in the same round.
+
+## Final verdict — Figure B: **PASS (shipping condition)**, with a fixed caption and one escalated note
+
+- The actual shipping condition (image + caption) scores 10/10 and cleanly recovers both KF1 and KF2
+  with no KF4 violation. **Citable as visual evidence for F2/F3 as of this round, with the caption below.**
+- **Caption fixed** (was: "...from left to right: kernel-launch/heuristics overhead, the matmul kernel
+  itself, the sparse-embedding optimizer's per-step `unique` call, and the metrics-logging `torch.stack`
+  call..."; the "from left to right" ordering claim is dropped as factually backwards against the actual
+  alphabetical layout):
+  > Self-CUDA-time flame chart for one M3 profiler capture (k=6, seed=1, contended host — other GPU jobs
+  > were running on the same host during this capture). Four leaves — kernel-launch/heuristics overhead,
+  > the matmul kernel itself, the sparse-embedding optimizer's per-step `unique` call, and the
+  > metrics-logging `torch.stack` call — each occupy a comparable, non-trivial share of total self-CUDA
+  > time (siblings are ordered alphabetically, not by size or position), unlike the companion
+  > self-CPU-time chart for the same capture, where one call dominates overwhelmingly.
+- **Escalated, not fixed (loop cap reached — 2 revision rounds used):** without a caption (e.g. slide
+  reuse, social excerpt, or any future context where this chart is shown alone), a careful reader may
+  still headline the largest *branch-point* subtree percentage instead of the four-way leaf split. Two
+  unexecuted options for a future round, for the user to weigh rather than something applied here: (i)
+  visually de-emphasize branch-point ancestor percentages (e.g. lighter weight, parentheses) so only leaf
+  percentages read as "headline" numbers; or (ii) accept caption-dependency as a permanent constraint of
+  this chart type and always ship it captioned, never bare.
+- Figure A (self_cpu): unchanged from Round 1, **PASS** stands (the Round 2/3 renderer changes are
+  additive-only — more information, never less — and were not expected to and did not require a fresh B
+  round; Figure A was regenerated with the same renderer purely to keep both companion charts in sync with
+  current code, not re-graded).
 
 ## Cost
 
-6 blind-interpreter agents (Sonnet x4, Haiku x2) + 1 fresh-context Sonnet grader. No repo writes by any
-interpreter or grader (read-only packets).
+Round 1: 6 blind-interpreter agents (Sonnet ×4, Haiku ×2) + 1 fresh-context Sonnet grader.
+Round 2: 3 blind-interpreter agents (Sonnet ×2, Haiku ×1) + 1 fresh-context Sonnet grader, Figure B only.
+Round 3: 3 blind-interpreter agents (Sonnet ×2, Haiku ×1) + 1 fresh-context Sonnet grader, Figure B only.
+Total: 12 blind-interpreter agents + 3 graders across 3 rounds. No repo writes by any interpreter or
+grader in any round (read-only packets).

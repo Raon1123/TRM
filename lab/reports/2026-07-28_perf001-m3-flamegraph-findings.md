@@ -4,6 +4,7 @@ parent: PERF-001
 status: attribution complete — 후보 제안, 승격 전
 date: 2026-07-28
 scope: "M3 profiler capture의 flame chart 귀속 결과와 Phase 1 후보 제안"
+figqa: cpu=PASS, cuda=PASS (2 revision rounds, 2026-07-29 → lab/audits/2026-07-29_figqa-m3-flamecharts.md)
 ---
 
 # PERF-001 M3 flame chart — 귀속 결과와 후보 제안
@@ -94,7 +95,22 @@ mask가 그 조건을 정확히 재현한다. **weight decay를 전 row에 적�
 
 `stack`의 프로젝트 호출자는 `pretrain.py(373)`, 즉 매 update의
 `torch.stack([metrics[k] for k in metric_keys])`다. 이는 계획서 Phase 1 후보 1(train logging
-cadence)이 겨냥한 경로와 정확히 일치하며, 이번 flame chart가 그 후보에 **실측 근거**를 준다.
+cadence)이 겨냥한 경로와 정확히 일치하며, §2 표의 수치(실측 근거)가 그 후보를 뒷받침한다.
+
+**fig-qa 게이트 (2026-07-29, 2 revision rounds 후 PASS):** 최초 판정은 REVISE-FIGURE —
+독립 blind reader 2명(caption 유무 무관) 모두 mm/launch-overhead/unique/stack **3~4갈래
+비등 분할**이라는 의도된 메시지를 그림만으로 복구하지 못했다(프레임별 수치 라벨 부재가
+원인). renderer에 프레임별 `(pct%)` 라벨을 추가(round 1)했으나 pass-through 체인 프레임에
+동일 숫자가 반복 출력되어 오히려 그 숫자에 주의가 쏠리는 2차 결함이 드러났고, `torch.stack`
+프레임은 truncation이 `<built-in method ` 접두부를 남기고 정작 식별어를 잘라내 caption을 쥐고도
+찾지 못하는 3번째 결함도 발견됨(round 2 재검증). round 3에서 pass-through 프레임 라벨 억제 +
+builtin-repr 접두부 제거(진짜 이름만 truncate) 적용 후 caption-informed 조건이 10/10으로 PASS.
+caption의 "left to right" 순서 주장이 실제 alphabetical 배치(`stack`이 최좌측)와 어긋난다는
+결함도 이 과정에서 독립적으로 발견되어 caption을 수정. no-caption 조건에서는 여전히 최대
+branch-point 서브트리 %(57.4%)를 4갈래 분할보다 앞세워 읽는 잔여 위험이 있음 — caption 없이
+단독 인용(슬라이드 등)될 경우 재검토 필요, 별도 renderer 작업으로 escalate(loop cap 2 도달).
+위 §2 표 수치 자체는 profiler 집계 테이블에서 직접 뽑은 것이라 이 판정과 무관하다.
+상세: `lab/audits/2026-07-29_figqa-m3-flamecharts.md`.
 
 ## 5. F3 — launch/heuristics 오버헤드가 CUDA의 29%
 

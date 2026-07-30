@@ -51,7 +51,7 @@
 <g>
 <title>pretrain.py(798):_launch (7,343,650 us, 100.00%)</title>
 <rect x="10" y="472" width="1180" height="15" fill="#e6741b" stroke="#ffffff" stroke-width="0.5"/>
-<text x="13" y="483" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">pretrain.py(798):_launch</text>
+<text x="13" y="483" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">pretrain.py(798):_launch (100.0%)</text>
 </g>
 <g>
 <title>models/ema.py(16):_update (10,829 us, 0.15%)</title>
@@ -60,7 +60,7 @@
 <g>
 <title>pretrain.py(373):_train_batch_profiled (7,284,293 us, 99.19%)</title>
 <rect x="11.74" y="456" width="1170.462" height="15" fill="#d11405" stroke="#ffffff" stroke-width="0.5"/>
-<text x="14.74" y="467" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">pretrain.py(373):_train_batch_profiled</text>
+<text x="14.74" y="467" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">pretrain.py(373):_train_batch_profiled (99.2%)</text>
 </g>
 <g>
 <title>&lt;built-in_method_cpu_of_Tensor_object_at_0x7f1794e50640&gt; (710 us, 0.01%)</title>
@@ -77,7 +77,7 @@
 <g>
 <title>&lt;built-in_method_stack_of_type_object_at_0x7f1869aa9b40&gt; (471,866 us, 6.43%)</title>
 <rect x="16.011" y="440" width="75.821" height="15" fill="#ef9d25" stroke="#ffffff" stroke-width="0.5"/>
-<text x="19.011" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;built...</text>
+<text x="19.011" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">stack</text>
 </g>
 <g>
 <title>torch/_compile.py(42):_inner (3,050 us, 0.04%)</title>
@@ -131,12 +131,12 @@
 <g>
 <title>torch/nn/modules/module.py(1780):__call_impl (1,046,912 us, 14.26%)</title>
 <rect x="92.322" y="360" width="168.221" height="15" fill="#ce0501" stroke="#ffffff" stroke-width="0.5"/>
-<text x="95.322" y="371" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/nn/modules/m...</text>
+<text x="95.322" y="371" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/nn/m... (14.3%)</text>
 </g>
 <g>
 <title>models/losses.py(50):_forward (1,042,698 us, 14.20%)</title>
 <rect x="92.322" y="344" width="167.544" height="15" fill="#f8ca30" stroke="#ffffff" stroke-width="0.5"/>
-<text x="95.322" y="355" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">models/losses.py(5...</text>
+<text x="95.322" y="355" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">models/los... (14.2%)</text>
 </g>
 <g>
 <title>torch/_compile.py(42):_inner (275 us, 0.00%)</title>
@@ -172,7 +172,7 @@
 <g>
 <title>torch/_functorch/_aot_autograd/runtime_wrappers.py(313):_runtime_wrapper (1,042,423 us, 14.19%)</title>
 <rect x="92.366" y="280" width="167.5" height="15" fill="#d31c06" stroke="#ffffff" stroke-width="0.5"/>
-<text x="95.366" y="291" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_functorch/_...</text>
+<text x="95.366" y="291" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_fun... (14.2%)</text>
 </g>
 <g>
 <title>torch/_functorch/_aot_autograd/runtime_wrappers.py(293):_record_runtime_wrapper_prologue_enter (426 us, 0.01%)</title>
@@ -200,7 +200,7 @@
 <g>
 <title>&lt;built-in_method_apply_of_FunctionMeta_object_at_0x14bf68e0&gt; (1,041,997 us, 14.19%)</title>
 <rect x="92.435" y="216" width="167.431" height="15" fill="#df5714" stroke="#ffffff" stroke-width="0.5"/>
-<text x="95.435" y="227" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;built-in_method_a...</text>
+<text x="95.435" y="227" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">&lt;built-in_... (14.2%)</text>
 </g>
 <g>
 <title>torch/_functorch/_aot_autograd/runtime_wrappers.py(2116):_forward (1,031,829 us, 14.05%)</title>
@@ -220,7 +220,7 @@
 <g>
 <title>torch/_inductor/output_code.py(611):___call__ (1,031,829 us, 14.05%)</title>
 <rect x="92.435" y="152" width="165.797" height="15" fill="#d8350c" stroke="#ffffff" stroke-width="0.5"/>
-<text x="95.435" y="163" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_inductor/ou...</text>
+<text x="95.435" y="163" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">torch/_ind... (14.1%)</text>
 </g>
 <g>
 <title>torch/_inductor/utils.py(3216):_run (221,027 us, 3.01%)</title>
@@ -275,7 +275,7 @@
 <g>
 <title>&lt;built-in_method__record_function_enter_new_of_pybind11_builtins.pybind11_detail_function_record_v1_system_libstdcpp_gxx_abi_1xxx_use_cxx11_abi_1_object_at_0x7f177284a830&gt; (810,802 us, 11.04%)</title>
 <rect x="127.95" y="104" width="130.282" height="15" fill="#d42308" stroke="#ffffff" stroke-width="0.5"/>
-<text x="130.95" y="115" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">&lt;built-in_met...</text>
+<text x="130.95" y="115" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">&lt;buil... (11.0%)</text>
 </g>
 <g>
 <title>torch/_tensor.py(575):_backward (6,361 us, 0.09%)</title>
@@ -311,7 +311,7 @@
 <g>
 <title>torch/optim/optimizer.py(505):_wrapper (5,201,755 us, 70.83%)</title>
 <rect x="345.916" y="440" width="835.834" height="15" fill="#ef9f26" stroke="#ffffff" stroke-width="0.5"/>
-<text x="348.916" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/optim/optimizer.py(505):_wrapper</text>
+<text x="348.916" y="451" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/optim/optimizer.py(505):_wrapper (70.8%)</text>
 </g>
 <g>
 <title>torch/autograd/profiler.py(800):___enter__ (20,599 us, 0.28%)</title>
@@ -328,7 +328,7 @@
 <g>
 <title>torch/utils/_contextlib.py(120):_decorate_context (5,181,156 us, 70.55%)</title>
 <rect x="349.226" y="424" width="832.524" height="15" fill="#ec8f22" stroke="#ffffff" stroke-width="0.5"/>
-<text x="352.226" y="435" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/utils/_contextlib.py(120):_decorate_context</text>
+<text x="352.226" y="435" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">torch/utils/_contextlib.py(120):_decorate_context (70.6%)</text>
 </g>
 <g>
 <title>adam_atan2_pytorch/adam_atan2.py(50):_step (25,980 us, 0.35%)</title>
@@ -366,7 +366,7 @@
 <g>
 <title>models/sparse_embedding.py(98):__sparse_emb_signsgd_dist (5,155,176 us, 70.20%)</title>
 <rect x="353.401" y="392" width="828.349" height="15" fill="#e05915" stroke="#ffffff" stroke-width="0.5"/>
-<text x="356.401" y="403" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">models/sparse_embedding.py(98):__sparse_emb_signsgd_dist</text>
+<text x="356.401" y="403" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#000000">models/sparse_embedding.py(98):__sparse_emb_signsgd_dist (70.2%)</text>
 </g>
 <g>
 <title>&lt;built-in_method_add__of_Tensor_object_at_0x7f1794e33570&gt; (249 us, 0.00%)</title>
@@ -424,7 +424,7 @@
 <g>
 <title>&lt;built-in_method__unique2_of_type_object_at_0x7f1869aa9b40&gt; (5,150,106 us, 70.13%)</title>
 <rect x="353.829" y="296" width="827.535" height="15" fill="#ce0802" stroke="#ffffff" stroke-width="0.5"/>
-<text x="356.829" y="307" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">&lt;built-in_method__unique2_of_type_object_at_0x7f1869aa9b40&gt;</text>
+<text x="356.829" y="307" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#ffffff">_unique2 (70.1%)</text>
 </g>
 <g>
 <title>pretrain.py(462):_profiled_train_batches (3,045 us, 0.04%)</title>

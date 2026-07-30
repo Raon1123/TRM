@@ -40,6 +40,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import math
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -56,6 +57,7 @@ __all__ = [
     "layout",
     "render_svg",
     "render_folded_text",
+    "display_name",
     "frame_color",
     "text_color_for",
     "metric_from_filename",
@@ -173,9 +175,32 @@ class Frame:
     height: float
     value: float
     ratio: float
+    #: True for a frame that does zero work of its own and forwards its entire
+    #: inclusive value to a single child (self_value == 0, exactly one child).
+    #: Its on-frame percentage is then numerically identical to that child's --
+    #: fig-qa 2026-07-29 round 2: printing it anyway makes the SAME number repeat
+    #: on every link of a long pass-through chain, and two independent blind
+    #: readers anchored their main claim on that repeated figure instead of the
+    #: real (comparably-sized, multi-way) split one level deeper. See render_svg.
+    is_passthrough: bool = False
 
 
 # --- parsing ---------------------------------------------------------------
+
+
+#: Name given to samples a profiler could not attribute to any Python frame.
+#: py-spy emits these as a bare value with no stack; for a training loop they are
+#: mostly native code running with the GIL released (CUDA kernels, libtorch).
+NO_PYTHON_FRAME = "(no python frame)"
+
+
+def _looks_numeric(token: str) -> bool:
+    """True when a lone token is a finite, non-negative number (a bare value)."""
+    try:
+        v = float(token)
+    except ValueError:
+        return False
+    return math.isfinite(v) and v >= 0
 
 
 def parse_folded(lines: Iterable[str], *, strict: bool = True) -> FoldedStacks:
@@ -189,8 +214,15 @@ def parse_folded(lines: Iterable[str], *, strict: bool = True) -> FoldedStacks:
       (``<built-in method mm of type object>``).
     * blank / whitespace-only lines and ``#`` comments -> skipped, not an
       issue.  They carry no data.
-    * missing value, non-numeric value, NaN/inf, **negative** value, empty
-      stack, or an empty frame inside the stack (``a;;b``) -> rejected.
+    * a lone numeric token (``1286``, i.e. a value with **no** stack) ->
+      accepted as a single frame named :data:`NO_PYTHON_FRAME`.  py-spy emits
+      this for samples it cannot attribute to any Python frame -- native code
+      holding no Python frame, which in a training loop is largely the CUDA
+      kernels.  Rejecting it would shrink the denominator and silently inflate
+      every other frame's percentage; naming it keeps the chart honest.
+      A lone **non**-numeric token (``a;b``) is still a missing-value error.
+    * missing value, non-numeric value, NaN/inf, **negative** value, or an
+      empty frame inside the stack (``a;;b``) -> rejected.
       ``strict=True`` (the default) raises :class:`FoldedStackError` on the
       first one; ``strict=False`` records a :class:`ParseIssue` and continues.
     * a value of exactly ``0`` is accepted (torch emits these); it simply adds
@@ -210,10 +242,23 @@ def parse_folded(lines: Iterable[str], *, strict: bool = True) -> FoldedStacks:
             continue
 
         parts = stripped.rsplit(None, 1)
-        if len(parts) != 2:
+        if len(parts) == 2:
+            stack_text, value_text = parts
+        elif len(parts) == 1 and _looks_numeric(parts[0]):
+            # py-spy emits a bare value with no stack (e.g. " 1286") for samples
+            # it cannot attribute to any Python frame -- native code running with
+            # the GIL released, which for a training loop is largely the CUDA
+            # kernels themselves.  That is real signal, not corruption: dropping
+            # it would silently shrink the denominator and inflate every other
+            # frame's percentage.  Keep it under an explicit name instead.
+            #
+            # Gated on the token being numeric so that a genuine stack-without-a-
+            # value ("a;b") stays a missing-value error rather than being
+            # misread as an empty stack whose value happens to be "a;b".
+            stack_text, value_text = NO_PYTHON_FRAME, parts[0]
+        else:
             _reject(result, line_number, "missing value (expected 'stack <value>')", text, strict)
             continue
-        stack_text, value_text = parts
 
         try:
             value = float(value_text)
@@ -228,8 +273,9 @@ def parse_folded(lines: Iterable[str], *, strict: bool = True) -> FoldedStacks:
             continue
 
         if not stack_text.strip():
-            _reject(result, line_number, "empty stack", text, strict)
-            continue
+            # Same case as the bare-value line above, reached when the stack is
+            # whitespace rather than absent.  Name it rather than discard it.
+            stack_text = NO_PYTHON_FRAME
         frames = [frame.strip() for frame in stack_text.split(";")]
         if any(not frame for frame in frames):
             _reject(result, line_number, "empty frame in stack", text, strict)
@@ -312,6 +358,7 @@ def layout(root: FrameNode, *, width: int = DEFAULT_WIDTH) -> Tuple[List[Frame],
                 height=FRAME_HEIGHT,
                 value=node.total,
                 ratio=node.total / total,
+                is_passthrough=len(node.children) == 1 and node.self_value == 0,
             )
         )
         # Children are laid out left-to-right alphabetically starting at the
@@ -339,6 +386,7 @@ def layout(root: FrameNode, *, width: int = DEFAULT_WIDTH) -> Tuple[List[Frame],
             height=f.height,
             value=f.value,
             ratio=f.ratio,
+            is_passthrough=f.is_passthrough,
         )
         for f in frames
     ]
@@ -423,6 +471,36 @@ def fit_label(name: str, box_width: float, *, font_size: float = FONT_SIZE) -> O
     if chars < MIN_TRUNCATED_LABEL_CHARS:
         return None
     return name[: chars - 3] + "..."
+
+
+_BUILTIN_METHOD_RE = re.compile(
+    r"^<built-in[ _]method[ _](.+?)[ _]of[ _]type[ _]object[ _]at[ _]0x[0-9a-fA-F]+>$"
+)
+_BUILTIN_FUNCTION_RE = re.compile(r"^<built-in[ _]function[ _](.+)>$")
+
+
+def display_name(name: str) -> str:
+    """Strip torch/pybind builtin-repr boilerplate from a frame's *label* only.
+
+    ``<built-in method mm of type object at 0x7f...>`` truncates, under a plain
+    character budget, to ``<built-in method m...`` -- the hex address and "of
+    type object at" filler consume the box before the one word that actually
+    identifies the frame (``mm``, ``stack``, ``_unique2``) ever appears.
+    fig-qa 2026-07-29 round 2: a caption-informed reader looking specifically
+    for a ``torch.stack`` frame could not find it in the rendered label for
+    exactly this reason, even though it was on the chart at 13.35%. torch's
+    own exporter writes spaces as underscores in these reprs (real captures),
+    but the pattern accepts either, matching what ``parse_folded`` accepts on
+    input. The tooltip and colour hash keep the raw ``name`` untouched -- this
+    only changes what gets truncated for the on-frame text.
+    """
+    m = _BUILTIN_METHOD_RE.match(name)
+    if m:
+        return m.group(1)
+    m = _BUILTIN_FUNCTION_RE.match(name)
+    if m:
+        return m.group(1)
+    return name
 
 
 def _format_value(value: float) -> str:
@@ -553,7 +631,35 @@ def render_svg(
             f'fill="{fill}" stroke="{FRAME_STROKE}" '
             f'stroke-width="0.5"/>'
         )
-        label = None if frame.ratio < MIN_LABEL_RATIO else fit_label(frame.name, frame.width)
+        display = display_name(frame.name)
+        label = None
+        if frame.ratio >= MIN_LABEL_RATIO:
+            if frame.is_passthrough:
+                # A pure pass-through frame (no self time, exactly one child)
+                # shows the SAME inclusive percentage its child does -- the
+                # number is not wrong, just redundant. fig-qa 2026-07-29 round
+                # 2: printing it anyway meant a long chain of these repeated
+                # the same figure on ~8 consecutive stacked frames, and two
+                # independent blind readers anchored their main claim on that
+                # repeated number instead of the real multi-way split one
+                # level deeper. Name only, no suffix, for these.
+                label = fit_label(display, frame.width)
+            else:
+                # An on-frame number lets a reader rank same-looking siblings
+                # without decoding relative box widths by eye (fig-qa
+                # 2026-07-29: two independent blind readers of a close
+                # multi-way split could not do this from width alone). The
+                # real torch frame names here are long repr strings
+                # ("<built-in method mm of type object at 0x...>"), so
+                # reserving room for the suffix *first* and truncating the
+                # (boilerplate-stripped) name around it -- rather than trying
+                # the whole "name (pct%)" and giving up if it doesn't fit --
+                # is what actually gets the percentage drawn on the frames
+                # fig-qa flagged, not just on short-named ones.
+                suffix = f" ({pct:.1f}%)"
+                reserved_width = len(suffix) * FONT_SIZE * CHAR_WIDTH_RATIO
+                name_part = fit_label(display, frame.width - reserved_width)
+                label = f"{name_part}{suffix}" if name_part else fit_label(display, frame.width)
         if label:
             out.append(
                 f'<text x="{_num(frame.x + FRAME_TEXT_PAD)}" '

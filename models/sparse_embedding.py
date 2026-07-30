@@ -46,6 +46,7 @@ class CastedSparseEmbeddingSignSGD_Distributed(Optimizer):
         world_size: int,
         lr: Union[float, torch.Tensor] = 1e-3,
         weight_decay: float = 1e-2,
+        dense_update: bool = False,
     ):
         if not 0.0 <= lr:
             raise ValueError(f"Invalid learning rate: {lr}")
@@ -55,7 +56,8 @@ class CastedSparseEmbeddingSignSGD_Distributed(Optimizer):
         defaults = dict(
             lr=lr,
             weight_decay=weight_decay,
-            world_size=world_size
+            world_size=world_size,
+            dense_update=dense_update,
         )
         super().__init__(params, defaults)
 
@@ -91,7 +93,8 @@ class CastedSparseEmbeddingSignSGD_Distributed(Optimizer):
                     
                     lr=group["lr"],
                     weight_decay=group["weight_decay"],
-                    world_size=group["world_size"]
+                    world_size=group["world_size"],
+                    dense_update=group["dense_update"],
                 )
 
 
@@ -102,7 +105,8 @@ def _sparse_emb_signsgd_dist(
     
     lr: float,
     weight_decay: float,
-    world_size: int
+    world_size: int,
+    dense_update: bool = False,
 ) -> None:
     N, D = local_weights_grad.shape
     
@@ -116,6 +120,43 @@ def _sparse_emb_signsgd_dist(
     
         dist.all_gather_into_tensor(all_weights_grad, local_weights_grad)
         dist.all_gather_into_tensor(all_ids,          local_ids)
+
+    if dense_update:
+        # PERF-001 candidate P1-A. Equivalent to the branch below, without the
+        # unique() call -- which forces a device-to-host sync because it must
+        # know its own output size, and which py-spy measured at 37.6% of wall
+        # time on the sigma^k config (num_puzzle_identifiers = 1, so every id in
+        # the batch is 0 and unique re-derives a constant on every step).
+        #
+        # Scatter straight into a full (P, D) buffer instead. Rows that do not
+        # appear in the batch accumulate nothing, so sign() of their gradient is
+        # 0 and the add is a no-op for them -- but the DECAY is not, which is the
+        # trap: applying `1 - lr*wd` to the whole table would decay embeddings
+        # this batch never touched. `scale` gates the decay to present rows only.
+        # Everything here is asynchronous; nothing reads a size back to the host.
+        # Every operation below takes its scalars as kernel arguments. Nothing
+        # copies a Python value to the device and nothing reads a size back, so
+        # the host never blocks. That is the whole point, and it is easy to lose:
+        # the first version of this branch used `weights.new_tensor(1.0 - lr*wd)`
+        # inside a torch.where, which is a synchronising host-to-device copy --
+        # py-spy showed the stall simply move off unique() and onto that line
+        # (42.9% of wall), with no net gain.
+        P = weights.shape[0]
+        index = all_ids.long()
+
+        # 1.0 where the row appears in this batch, 0.0 otherwise. scatter_ takes
+        # a scalar `value`, so no ones-tensor is materialised.
+        present = torch.zeros((P, 1), dtype=weights.dtype, device=weights.device)
+        present.scatter_(0, index.unsqueeze(-1), 1.0)
+
+        grad = torch.zeros((P, D), dtype=all_weights_grad.dtype, device=all_weights_grad.device)
+        grad.scatter_add_(0, index.unsqueeze(-1).expand(-1, D), all_weights_grad)
+
+        # Decay only the rows that appeared: absent rows get scale exactly 1.0.
+        # Their gradient is 0, so sign() is 0 and the add is a no-op for them.
+        scale = 1.0 - present * (lr * weight_decay)
+        weights.mul_(scale).add_(torch.sign(grad), alpha=-lr)
+        return
 
     # Unique
     grad_ids, inv = all_ids.unique(return_inverse=True)

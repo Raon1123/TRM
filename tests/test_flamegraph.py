@@ -37,6 +37,7 @@ from analysis.flamegraph import (  # noqa: E402
     Frame,
     FoldedStackError,
     build_tree,
+    display_name,
     fit_label,
     frame_color,
     layout,
@@ -46,6 +47,7 @@ from analysis.flamegraph import (  # noqa: E402
     render_folded_text,
     render_svg,
     units_for_metric,
+    NO_PYTHON_FRAME,
 )
 
 SVG_NS = "{http://www.w3.org/2000/svg}"
@@ -435,9 +437,85 @@ def test_long_names_are_truncated_with_an_ellipsis_but_kept_whole_in_the_tooltip
 
     labels = [t.text for t in root.iter(f"{SVG_NS}text")]
     truncated = [t for t in labels if t and t.startswith("torch/nn")]
-    assert truncated and truncated[0].endswith("...")
+    assert truncated and "..." in truncated[0]
     assert len(truncated[0]) < len(long_name)
     assert any(long_name in (t.text or "") for t in root.iter(f"{SVG_NS}title"))
+
+
+def test_on_frame_label_carries_a_percentage_when_the_box_has_room():
+    # Two evenly-split siblings, each with a plain short name -- plenty of room
+    # for "name (50.0%)" whole. fig-qa 2026-07-29: without this, ranking
+    # same-width siblings requires decoding relative box widths by eye.
+    folded = "left 50\nright 50\n"
+    svg = render_folded_text(folded, width=400)
+    labels = {t.text for t in ET.fromstring(svg).iter(f"{SVG_NS}text")}
+    assert "left (50.0%)" in labels
+    assert "right (50.0%)" in labels
+
+
+def test_builtin_repr_boilerplate_is_stripped_from_the_label_not_the_tooltip():
+    # Real torch frames repr as "<built-in method mm of type object at 0x...>"
+    # -- the hex address and "of type object at" filler are never the part
+    # that identifies the frame. fig-qa 2026-07-29 round 2: this boilerplate
+    # ate the truncation budget before the operation name (here short enough
+    # to need no truncation at all) ever rendered.
+    long_name = "<built-in method mm of type object at 0x7f1869aa9b40>"
+    folded = f"{long_name} 30\nother 70\n"
+    svg = render_folded_text(folded, width=400)
+    root = ET.fromstring(svg)
+    labels = {t.text for t in root.iter(f"{SVG_NS}text")}
+    assert "mm (30.0%)" in labels
+    # ...but the tooltip and colour hash still see the untouched raw name.
+    assert any(long_name in (t.text or "") for t in root.iter(f"{SVG_NS}title"))
+
+
+def test_long_operation_name_percentage_reserves_room_for_the_suffix():
+    # Even after boilerplate-stripping, a genuinely long operation name must
+    # still surface its percentage: the (cleaned) name truncates around the
+    # suffix rather than the suffix being dropped because the whole
+    # "name (pct%)" string didn't fit.
+    long_name = "<built-in method a_very_long_operation_name_indeed of type object at 0x7f1869aa9b40>"
+    folded = f"{long_name} 30\nother 70\n"
+    svg = render_folded_text(folded, width=400)
+    labels = [t.text for t in ET.fromstring(svg).iter(f"{SVG_NS}text")]
+    op_label = next(t for t in labels if t and t.startswith("a_v"))
+    assert op_label.endswith("(30.0%)")
+    assert "..." in op_label
+    assert "<built-in" not in op_label
+
+
+def test_display_name_accepts_space_or_underscore_separated_builtin_reprs():
+    # torch's own exporter writes spaces as underscores in these reprs (real
+    # captures); parse_folded accepts literal spaces too (docstring example).
+    # display_name must clean both conventions identically.
+    assert display_name("<built-in method mm of type object at 0x7f0000000000>") == "mm"
+    assert display_name("<built-in_method_mm_of_type_object_at_0x7f0000000000>") == "mm"
+    assert display_name("<built-in function __launch_kernel>") == "__launch_kernel"
+    assert display_name("<built-in_function__launch_kernel>") == "_launch_kernel"
+    # anything that doesn't match the pattern passes through unchanged.
+    assert display_name("torch/nn/modules/module.py(1518): _call_impl") == (
+        "torch/nn/modules/module.py(1518): _call_impl"
+    )
+
+
+def test_passthrough_chain_link_has_no_redundant_percentage():
+    # a -> b -> c, single child at every level, no frame does its own work
+    # until the leaf: b's inclusive share is numerically identical to c's.
+    # fig-qa 2026-07-29 round 2: printing "(pct%)" on every link of a chain
+    # like this repeats the same number on each of several stacked frames,
+    # and blind readers anchored their main claim on the repeated figure
+    # instead of the real split that lives at the leaf.
+    folded = "a;b;c 100\nsibling 50\n"
+    svg = render_folded_text(folded, width=800)
+    root = ET.fromstring(svg)
+    labels = {t.text for t in root.iter(f"{SVG_NS}text")}
+    assert "a" in labels
+    assert "b" in labels
+    assert "c (66.7%)" in labels
+    # the tooltip still carries the percentage for every frame, passthrough
+    # or not -- only the on-frame label is affected.
+    titles = [t.text or "" for t in root.iter(f"{SVG_NS}title")]
+    assert any(t.startswith("b (") and "66.67%" in t for t in titles)
 
 
 def test_fit_label_returns_none_when_the_box_cannot_hold_a_readable_label():
@@ -677,3 +755,46 @@ def test_very_deep_stacks_do_not_hit_a_recursion_limit():
 
     root = ET.fromstring(svg)
     assert float(root.get("height")) > 2000 * ROW_HEIGHT
+
+
+# --------------------------------------------------------------------------
+# py-spy interop: samples with no attributable Python frame
+# --------------------------------------------------------------------------
+
+
+def test_bare_numeric_line_becomes_a_named_frame_not_a_rejection():
+    """py-spy writes ' 1286' for samples with no Python frame.
+
+    Rejecting it would drop real signal AND shrink the denominator, inflating
+    every other frame's percentage.  It must survive as an explicit frame.
+    """
+    parsed = parse_folded(["a;b 10", " 1286"])
+
+    assert parsed.issues == []
+    assert ((NO_PYTHON_FRAME,), 1286.0) in parsed.samples
+    assert parsed.total == pytest.approx(1296.0)
+
+    root = build_tree(parsed.samples)
+    assert root.total == pytest.approx(1296.0)
+    assert NO_PYTHON_FRAME in root.children
+
+
+def test_lone_non_numeric_token_is_still_a_missing_value_error():
+    """The bare-value rule must not swallow a genuine stack-without-a-value."""
+    with pytest.raises(FoldedStackError) as excinfo:
+        parse_folded(["a;b"])
+    assert "missing value" in excinfo.value.reason
+
+
+def test_real_pyspy_output_parses_without_lenient_mode(tmp_path):
+    """End-to-end shape of an actual `py-spy record --format raw` file."""
+    text = (
+        "<module> (train.py:8);outer (train.py:7);inner (train.py:4) 161\n"
+        "<module> (train.py:8);outer (train.py:7) 12\n"
+        " 40\n"
+    )
+    parsed = parse_folded(text.splitlines())
+
+    assert parsed.issues == []
+    assert parsed.total == pytest.approx(213.0)
+    assert NO_PYTHON_FRAME in render_folded_text(text)

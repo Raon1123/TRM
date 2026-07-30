@@ -80,3 +80,6 @@ perf_benchmark:
   repeat: 1
   bootstrap_resamples: 10000
   bootstrap_seed: 0
+
+# PERF-001 candidate P1-A rollback switch (off = registered unique() path).
+puzzle_emb_dense_update: false

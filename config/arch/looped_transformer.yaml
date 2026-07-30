@@ -1,0 +1,30 @@
+name: recursive_reasoning.looped_transformer@Model_ACTV3
+loss:
+  name: losses@ACTLossHead
+  loss_type: stablemax_cross_entropy
+
+halt_exploration_prob: 0.1
+# Pinned to 1 by every sweep cell: looping must come ONLY from H_cycles,
+# otherwise the ACT outer loop is a second, confounded recurrence axis.
+halt_max_steps: 1
+
+H_cycles: 6   # loop count T (ACTIVE -- unlike transformers_baseline)
+H_layers: 2   # layers in the weight-tied block; effective depth = H_layers * H_cycles
+
+hidden_size: 512
+num_heads: 8  # head_dim = 64, matching trm/trm_singlez (tfb's 12 gives 512//12 = 42)
+expansion: 4
+
+puzzle_emb_ndim: ${.hidden_size}
+
+pos_encodings: rope
+forward_dtype: bfloat16
+
+# 0 = full BPTT through all H_cycles (canonical looped transformer).
+# 1 = TRM's 1-step-gradient approximation, without the z-carry.
+loop_grad_cycles: 0
+input_injection_every_cycle: True
+# 0 = ceil-div (= 1 here), matching transformers_baseline so the looped and
+# multi-layer arms share sequence geometry. trm.yaml pins 16 instead; set this
+# to 16 only for cells meant to match TRM's geometry (see lt_loop2x21_pel16).
+puzzle_emb_len: 0

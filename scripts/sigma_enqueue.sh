@@ -97,6 +97,87 @@ TRM_ABLATIONS=(
 TFB_LAYERS=(1 2 6)
 TFB_CYCLES=(1 6)
 
+# ---- Looped vs multi-layer transformer baselines (STAGES=looped) ---------
+# Purpose: give TRM a comparison baseline in the sense the literature uses
+# "looped transformer" (Yang et al. ICLR 2024; Fan et al. ICLR 2025) — a
+# weight-TIED block applied T times with FULL backprop — against an untied
+# multi-layer stack of the same effective depth.
+#
+# What already exists and is NOT re-run here:
+#   - multi-layer arm: `transformers_baseline` IS the untied stack. Its
+#     `H_cycles` field is dead code (single pass, transformers_baseline.py
+#     Model_ACTV2_Inner.forward), which is why the 18 `abl_tfb_*_cyc6_*`
+#     cells were duplicates and got skipped on 10.0.12.93. Pinned by
+#     tests/test_looped_transformer.py::test_transformers_baseline_ignores_cycles.
+#   - TRM anchor: `fig1_tf_z_iter_k*_s1` (arch=trm, H3 L6, L_layers=2).
+#
+# Head-count matching: the deep arm is re-run at `arch.num_heads=8` rather
+# than reusing the existing abl_tfb_* runs, because tfb's yaml default is 12
+# (head_dim = 512//12 = 42) while trm and looped_transformer use 8
+# (head_dim = 64). Comparing across that would confound the tying axis.
+#
+# Grid is built as MATCHED PAIRS, not two independent sweeps — the confound
+# to avoid is the one already on record for iter on/off (iter↔recurrent-
+# compute): effective depth D = H_layers x H_cycles is stated per cell, and
+# every cell holds hidden_size=512, num_heads=8, halt_max_steps=1, seed,
+# data and protocol fixed to fig1.
+#
+#   tag        | arch                  | arch overrides                        | D  | params
+#   deep2      | transformers_baseline | H_layers=2                            | 2  | 2 blocks
+#   deep12     | transformers_baseline | H_layers=12                           | 12 | 12 blocks
+#   loop2x6    | looped_transformer    | H_layers=2  H_cycles=6                | 12 | 2 blocks
+#   loop2x21   | looped_transformer    | H_layers=2  H_cycles=21               | 42 | 2 blocks
+# deep2/deep12/loop2x6 form the minimal complete triangle: loop2x6 is
+# depth-matched to deep12 and parameter-matched to deep2, so "does tying buy
+# depth" and "does looping beat just being shallow" are both readable off one
+# k-row.
+# loop2x21 is the TRM-matched cell and the single most informative one here.
+# The fig1 TRM anchor applies its 2-layer block (L_cycles+1) x H_cycles = 7x3
+# = 21 times, i.e. effective depth 42 at 6,828,034 params — byte-identical
+# param count to loop2x6/loop2x21 (verified by instantiation). So loop2x21 is
+# matched to fig1_tf_z_iter on BOTH parameters and effective depth, leaving
+# FOUR differences: z-carry, the 1-step gradient, the injection schedule, and
+# puzzle_emb_len.
+# That last one is a trap: trm.yaml pins puzzle_emb_len=16 while ACTV2/ACTV3
+# use the ceil-div default of 1, so TRM runs on a 27-position sequence and the
+# lt_ grid on a 12-position one — and the PARAMETER COUNT IS IDENTICAL either
+# way (puzzle_emb is num_puzzle_identifiers x ndim), so a param check does not
+# surface it. The whole lt_ grid is held at the ceil-div default so the looped
+# and multi-layer arms share geometry; `lt_loop2x21_pel16` (tier C) is the one
+# cell that switches to 16, isolating this axis instead of confounding it.
+# NOTE (memory): loop2x21 is the heaviest cell — full BPTT retains ~42 layer
+# activations. If it OOMs, the first fallback is global_batch_size=1024 for
+# that cell ONLY, recorded as a protocol deviation.
+LOOPED_TIER_A=(
+    "deep2|transformers_baseline|arch.H_layers=2"
+    "deep12|transformers_baseline|arch.H_layers=12"
+    "loop2x6|looped_transformer|arch.H_layers=2 arch.H_cycles=6"
+    "loop2x21|looped_transformer|arch.H_layers=2 arch.H_cycles=21"
+)
+# Tier B — how performance depends on the (block-depth x loop-count)
+# factorization at fixed D, and on D itself. Restricted to a k subset.
+LOOPED_TIER_B=(
+    "loop1x12|looped_transformer|arch.H_layers=1 arch.H_cycles=12"
+    "loop3x4|looped_transformer|arch.H_layers=3 arch.H_cycles=4"
+    "loop6x2|looped_transformer|arch.H_layers=6 arch.H_cycles=2"
+    "loop2x3|looped_transformer|arch.H_layers=2 arch.H_cycles=3"
+    "loop2x12|looped_transformer|arch.H_layers=2 arch.H_cycles=12"
+    "deep4|transformers_baseline|arch.H_layers=4"
+    "deep6|transformers_baseline|arch.H_layers=6"
+)
+# Tier C — the two knobs that separate a canonical looped transformer from
+# TRM's recurrence, ablated at fixed architecture (loop2x6):
+#   grad1  = TRM's 1-step-gradient approximation (H_cycles-1 under no_grad)
+#            but with no z-carry — isolates the approximation from the z axis.
+#   noinj  = input embedding injected only on the first cycle.
+LOOPED_TIER_C=(
+    "loop2x6_grad1|looped_transformer|arch.H_layers=2 arch.H_cycles=6 arch.loop_grad_cycles=1"
+    "loop2x6_noinj|looped_transformer|arch.H_layers=2 arch.H_cycles=6 arch.input_injection_every_cycle=False"
+    "loop2x21_pel16|looped_transformer|arch.H_layers=2 arch.H_cycles=21 arch.puzzle_emb_len=16"
+)
+LOOPED_K_FULL=(3 4 5 6 7 8 10)   # tier A
+LOOPED_K_SUBSET=(4 6 8)          # tiers B, C
+
 # emit_job <run_name> <arch> <k> <seed> <arch_args...>
 emit_job() {
     local run_name="$1" arch="$2" k="$3" s="$4"; shift 4
@@ -280,6 +361,30 @@ main() {
             done
         done
     fi
+    # -- 3) looped vs multi-layer transformer baselines (STAGES=looped) --
+    #    Not in the default STAGES: this stage is opt-in so re-running the
+    #    script for fig1/ablation never silently adds it.
+    if [[ " $STAGES " == *" looped "* ]]; then
+        emit_looped_tier LOOPED_TIER_A LOOPED_K_FULL
+        emit_looped_tier LOOPED_TIER_B LOOPED_K_SUBSET
+        emit_looped_tier LOOPED_TIER_C LOOPED_K_SUBSET
+    fi
+}
+
+# emit_looped_tier <tier_array_name> <k_array_name>  — k-major within a tier
+emit_looped_tier() {
+    local -n tier_ref="$1"
+    local -n k_ref="$2"
+    local k spec tag arch arch_args s
+    for k in "${k_ref[@]}"; do
+        for spec in "${tier_ref[@]}"; do
+            IFS='|' read -r tag arch arch_args <<< "$spec"
+            for s in "${SEEDS[@]}"; do
+                emit_job "${prefix}lt_${tag}_k${k}_s${s}" "$arch" "$k" "$s" \
+                    "${arch_args} arch.num_heads=8 arch.halt_max_steps=1"
+            done
+        done
+    done
 }
 
 # =================  machinery below, no need to edit  ====================

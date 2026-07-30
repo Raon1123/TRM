@@ -41,11 +41,29 @@ prefix=""
 #   z:      z   -> arch=trm (z-carry) | noz -> arch=trm_singlez (no z)
 #   iter:   iter-> H_cycles=3 L_cycles=6 | noiter -> H_cycles=1 L_cycles=1
 #   fixed across all: arch.L_layers=2, arch.halt_max_steps=1  (matches legacy fig1)
-# Single seed (=1) for a fast grid; add 2 3 to SEEDS later for min/max bands.
+# Multi-seed (1,2,3) as of 2026-07-29 (EXP-013): min/max bands for fig1 + ablation.
+# `enqueue()` is idempotent (skips any run_name already in jobs/processing/done/failed),
+# so re-running with this array only adds the missing seed 2/3 cells — seed=1 is not
+# re-trained. This array drives BOTH the fig1 grid (§1) and the ablation grid (§2) below.
+# ⚠️ Idempotency is HOST-LOCAL: on a host whose scripts/queue/ has no fig1_*_s1
+# entries (e.g. 10.0.12.93), SEEDS=(1 2 3) would re-emit and re-train all 56 seed=1
+# fig1 cells — on such a host, edit SEEDS to (2 3) and record the deviation.
 
 WANDB_PROJECT="Sigma_k_new"
 K_LIST=(3 4 5 6 7 8 10)
-SEEDS=(1)
+SEEDS=(1 2 3)
+# Ablation seed=1 (70 cells, EXP-011) ran on a SEPARATE host (10.0.12.93) whose
+# `scripts/queue/` this host's enqueue() idempotency check cannot see — re-adding
+# seed 1 here would silently re-emit and re-train all 70 already-done cells (this
+# host's local done/jobs/ has zero abl_* entries, confirmed 2026-07-29). Ablation
+# therefore gets its OWN seed list with only the genuinely-new seeds; fig1's
+# seed=1 is safe under SEEDS above because it already lives in THIS host's
+# scripts/queue/done/ (idempotent skip verified via --dry-run, EXP-013 §4.1).
+ABLATION_SEEDS=(2 3)
+# The looped baseline grid (EXP-014, STAGES=looped) is registered at seed=1
+# single — its seed count is a PENDING PI decision (EXP-014 §7-2). It must NOT
+# inherit the fig1 SEEDS array: that would silently triple the 58-cell grid.
+LOOPED_SEEDS=(1)
 DATA_ROOT="data/sigma_k_10"          # canonical n=10, ord(σ)>k-clean (EXP-007 fixed)
 
 # Protocol-matched to legacy fig1 all_config.yaml (Sigma_k_fig12), verified 2026-07-21:
@@ -344,7 +362,7 @@ main() {
         for k in "${K_LIST[@]}"; do
             for spec in "${TRM_ABLATIONS[@]}"; do
                 IFS='|' read -r tag arch_args <<< "$spec"
-                for s in "${SEEDS[@]}"; do
+                for s in "${ABLATION_SEEDS[@]}"; do
                     emit_job "${prefix}abl_${tag}_k${k}_s${s}" "trm" "$k" "$s" \
                         "arch.mlp_t=False arch.H_cycles=3 arch.L_cycles=6" \
                         "arch.L_layers=2 arch.halt_max_steps=1 ${arch_args}"
@@ -352,7 +370,7 @@ main() {
             done
             for lay in "${TFB_LAYERS[@]}"; do
                 for cyc in "${TFB_CYCLES[@]}"; do
-                    for s in "${SEEDS[@]}"; do
+                    for s in "${ABLATION_SEEDS[@]}"; do
                         emit_job "${prefix}abl_tfb_lay${lay}_cyc${cyc}_k${k}_s${s}" \
                             "transformers_baseline" "$k" "$s" \
                             "arch.H_layers=${lay} arch.H_cycles=${cyc} arch.halt_max_steps=1"
@@ -379,7 +397,7 @@ emit_looped_tier() {
     for k in "${k_ref[@]}"; do
         for spec in "${tier_ref[@]}"; do
             IFS='|' read -r tag arch arch_args <<< "$spec"
-            for s in "${SEEDS[@]}"; do
+            for s in "${LOOPED_SEEDS[@]}"; do
                 emit_job "${prefix}lt_${tag}_k${k}_s${s}" "$arch" "$k" "$s" \
                     "${arch_args} arch.num_heads=8 arch.halt_max_steps=1"
             done

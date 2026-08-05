@@ -10,10 +10,9 @@ logs/
 scripts/queue/
 
 lab/
+lab.pre-symlink-20260805/
 # lab is a symlink to /mnt/ayp/agents/trm — the dir pattern lab/ won't match a symlink
-lab
-!lab/
-lab/*
+lab.*
 
 # root-level md are working notes, not code — keep out of git (tracked README.md / goal-graph-orchestration.md unaffected)
 /*.md

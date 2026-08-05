@@ -1,33 +1,75 @@
-# Less is More: Recursive Reasoning with Tiny Networks
+# TRM — Weight-Tied Recurrence: Expressivity & Convergence Dynamics
 
-This is the codebase for the paper: "Less is More: Recursive Reasoning with Tiny Networks". TRM is a recursive reasoning approach that achieves amazing scores of 45% on ARC-AGI-1 and 8% on ARC-AGI-2 using a tiny 7M parameters neural network.
+This is a research fork of **Tiny Recursion Model (TRM)**, repurposed from paper-reproduction
+code into an active investigation of *why* a weight-tied recursive block reasons well: what its
+latent state `z` actually carries, whether recursion depth alone (without `z`) can substitute for
+it, and how the network's fixed-point / spectral behavior tracks its ability to generalize.
 
-[Paper](https://arxiv.org/abs/2510.04871)
+The primary experimental domain is **σ^k permutation composition**: given a random permutation
+σ on a fixed-size set, predict σ^k (the k-fold composition of σ with itself) for a permutation
+size `n=10` held fixed across all runs, with composition depth `k` as the swept variable. This is
+a synthetic, exactly-checkable task chosen so that capacity, depth, and convergence behavior can
+be measured directly rather than inferred from benchmark accuracy.
 
-### Motivation
+This is not the official paper repository — see [Upstream & citation](#upstream--citation) below
+for the original work this is built on. The original ARC-AGI / Sudoku / Maze pipeline from that
+paper is still present and runnable (see [Upstream paper experiments](#upstream-paper-experiments)),
+but it is no longer the focus of active work here.
 
-Tiny Recursion Model (TRM) is a recursive reasoning model that achieves amazing scores of 45% on ARC-AGI-1 and 8% on ARC-AGI-2 with a tiny 7M parameters neural network. The idea that one must rely on massive foundational models trained for millions of dollars by some big corporation in order to achieve success on hard tasks is a trap. Currently, there is too much focus on exploiting LLMs rather than devising and expanding new lines of direction. With recursive reasoning, it turns out that “less is more”: you don’t always need to crank up model size in order for a model to reason and solve hard problems. A tiny model pretrained from scratch, recursing on itself and updating its answers over time, can achieve a lot without breaking the bank.
-
-This work came to be after I learned about the recent innovative Hierarchical Reasoning Model (HRM). I was amazed that an approach using small models could do so well on hard tasks like the ARC-AGI competition (reaching 40% accuracy when normally only Large Language Models could compete). But I kept thinking that it is too complicated, relying too much on biological arguments about the human brain, and that this recursive reasoning process could be greatly simplified and improved. Tiny Recursion Model (TRM) simplifies recursive reasoning to its core essence, which ultimately has nothing to do with the human brain, does not require any mathematical (fixed-point) theorem, nor any hierarchy.
-
-### How TRM works
+## How TRM works
 
 <p align="center">
-  <img src="https://AlexiaJM.github.io/assets/images/TRM_fig.png" alt="TRM"  style="width: 30%;">
+  <img src="https://AlexiaJM.github.io/assets/images/TRM_fig.png" alt="TRM" style="width: 30%;">
 </p>
 
-Tiny Recursion Model (TRM) recursively improves its predicted answer y with a tiny network. It starts with the embedded input question x and initial embedded answer y and latent z. For up to K improvements steps, it tries to improve its answer y. It does so by i) recursively updating n times its latent z given the question x, current answer y, and current latent z (recursive reasoning), and then ii) updating its answer y given the current answer y and current latent z. This recursive process allows the model to progressively improve its answer (potentially addressing any errors from its previous answer) in an extremely parameter-efficient manner while minimizing overfitting.
+TRM recursively improves a predicted answer `y` with a single tiny weight-tied network. Starting
+from the embedded input `x`, an initial answer `y`, and an initial latent `z`, it repeats, for up
+to `K` improvement steps: (i) recursively update `z` `n` times given `(x, y, z)`, then (ii) update
+`y` given `(y, z)`. The same weights are reused at every step — there is no growth in parameter
+count with depth, only more computation.
 
-### Requirements
+The `z`-vs-no-`z` and iteration-count axes above are exactly what this fork's experiments sweep:
+`arch=trm` keeps the latent carry, `arch=trm_singlez` removes it; `H_cycles`/`L_cycles` control
+how much recursive compute each step gets.
 
-Installation should take a few minutes. For the smallest experiments on Sudoku-Extreme (pretrain_mlp_t_sudoku), you need 1 GPU with enough memory. With 1 L40S (48Gb Ram), it takes around 18h to finish. In case that you run into issues due to library versions, here is the requirements with the exact versions used: [specific_requirements.txt](https://github.com/SamsungSAILMontreal/TinyRecursiveModels/blob/main/specific_requirements.txt).
+## Research focus
 
-- Python 3.10 (or similar)
-- Cuda 12.6.0 (or similar)
+- **Architecture variants** (`config/arch/`): `trm` (z-carry), `trm_singlez` (no z — the collapse
+  cohort), `transformers_baseline`, `hrm` (the original two-level Hierarchical Reasoning Model).
+- **Diagnostics**: `measure_rho.py` computes the spectral radius of the weight-tied block at its
+  fixed point and an AGOP (average gradient outer product) alignment measure, from a checkpoint.
+- **z dynamics logging**: runs with `+log_z_dynamics=True` emit `z/eff_rank`, `phase/index`, and
+  `z/delta_step_*` to Weights & Biases (project `Sigma_k` / `Sigma_k_new`) for tracking how the
+  latent evolves across recursive steps and training.
+- **Live findings, hypotheses, and experiment reports** live in `lab/` (`lab/reports/`,
+  `lab/theory/`), not in this README — start at `lab/INDEX.md` for the current state. Read those
+  before treating any specific claim about `z`-removal or collapse as settled; the mechanism is
+  under active investigation, not established.
 
-### Installation with uv
+## Repository layout
 
-This project uses uv for fast Python package management and includes predefined commands for dataset building and experiments.
+| Path | Contents |
+|---|---|
+| `pretrain.py` | Single training run entry point (Hydra config, one process per GPU) |
+| `measure_rho.py` | Post-hoc spectral radius / AGOP diagnostics from a checkpoint |
+| `config/` | Hydra configs: `cfg_pretrain.yaml` (base) + `arch/*.yaml` (per-variant) |
+| `dataset/` | Dataset builders — `build_sigma_k_dataset.py` (σ^k task) plus the original ARC/Sudoku/Maze builders |
+| `models/` | Model implementations, incl. `models/recursive_reasoning/{trm,trm_singlez}.py` |
+| `scripts/sigma_enqueue.sh` | Declarative grid-search job enqueuer (edit the sweep, `--dry-run` first) |
+| `scripts/queue_run.sh` | File-based FIFO GPU job queue runner (see `CONCURRENCY.md`) |
+| `analysis/` | Figure generation and metric-extraction scripts |
+| `lab/` | Research notebook: hypotheses, experiment reports, figures, daily logs |
+| `tests/` | pytest suite covering the queue, figure pipeline, and data tooling |
+| `checkpoints/<project>/<run_name>/step_<N>` | Saved model state (EMA weights on disk) |
+
+## Requirements
+
+- Python 3.12 (see `pyproject.toml`)
+- CUDA 12.6 (or similar)
+
+Installation should take a few minutes.
+
+## Installation with uv
 
 ```bash
 # Install uv
@@ -43,140 +85,95 @@ uv pip install -e .
 wandb login YOUR-LOGIN
 ```
 
-Alternatively, using pip:
+## Dataset preparation
+
+### σ^k permutation composition (primary)
 
 ```bash
-pip install --upgrade pip wheel setuptools
-pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu126 # install torch based on your cuda version
-pip install -r requirements.txt # install requirements
-pip install --no-cache-dir --no-build-isolation adam-atan2 
-wandb login YOUR-LOGIN # login if you want the logger to sync results to your Weights & Biases (https://wandb.ai/)
+python dataset/build_sigma_k_dataset.py \
+  --output-dir data/sigma_k_10 \
+  --n 10 --only-k 3 --train-size 5000 --test-size 1000
 ```
 
-### Dataset Preparation
+This writes `data/sigma_k_10/3/{train,test}`. `--output-dir` is the *parent* directory — each
+`k` gets its own subdirectory, appended automatically. `n` is fixed at 10 across this project's
+experiments; `--only-k` restricts the build to a single composition depth (omit it to build the
+default grid `[3,4,5,6,7,8,10]` in one call). `data/sigma_k_10/<k>` is the current, order-filtered
+dataset generation — see `dataset/build_sigma_k_dataset.py`'s module docstring for the exact task
+format and the `order_filter` provenance note before reusing an older `data/sigma_k/` directory.
 
-You can build datasets using the predefined uv commands or directly with Python.
+### Upstream ARC-AGI / Sudoku / Maze builders (still supported)
 
 ```bash
-# Using uv run (recommended)
 uv run build-arc1
 uv run build-arc2
 uv run build-sudoku
 uv run build-maze
-
-# Or directly with Python
-python -m dataset.build_arc_dataset \
-  --input-file-prefix kaggle/combined/arc-agi \
-  --output-dir data/arc1concept-aug-1000 \
-  --subsets training evaluation concept \
-  --test-set-name evaluation
-
-python -m dataset.build_arc_dataset \
-  --input-file-prefix kaggle/combined/arc-agi \
-  --output-dir data/arc2concept-aug-1000 \
-  --subsets training2 evaluation2 concept \
-  --test-set-name evaluation2
-
-python dataset/build_sudoku_dataset.py --output-dir data/sudoku-extreme-1k-aug-1000  --subsample-size 1000 --num-aug 1000
-
-python dataset/build_maze_dataset.py
 ```
 
-## Note: You cannot train on both ARC-AGI-1 and ARC-AGI-2 and evaluate them both because ARC-AGI-2 training data contains some ARC-AGI-1 eval data
+## Running σ^k experiments
 
-## Experiments
-
-### ARC-AGI-1 (assuming 4 H-100 GPUs):
+The experiment pipeline is: define a sweep → enqueue job files → run them on a GPU queue →
+measure. Full operational detail (GPU/queue conventions, config keys, report discipline) is in
+`CLAUDE.md`; the shape of it:
 
 ```bash
-# Using uv run
+# 1. Define the grid by editing the *_SWEEP / K_LIST variables in the script, then:
+scripts/sigma_enqueue.sh --dry-run <prefix>    # print the grid — check before spending GPU time
+scripts/sigma_enqueue.sh <prefix>              # write job files to scripts/queue/jobs/
+
+# 2. Run: one worker per GPU, single FIFO queue
+scripts/queue_run.sh                           # start workers (default GPUs 4 5 6 7)
+scripts/queue_run.sh status                    # queued / processing / done / failed
+touch scripts/queue/stop                       # drain: finish in-flight jobs, then exit
+
+# 3. Or, a single one-off run without the queue:
+uv run pretrain.py arch=trm data_paths="[data/sigma_k_10/3]" +run_name="my_run" ema=True
+
+# 4. Analysis: checkpoint -> spectral radius / AGOP
+CUDA_VISIBLE_DEVICES=4 uv run python measure_rho.py --fixed-point --model-variant trm \
+    --checkpoint checkpoints/<project>/<run_name>/step_<N> --save-spectral /tmp/spec.jsonl
+```
+
+Swap `arch=trm` for `arch=trm_singlez` to run the no-z cohort.
+
+## Tests
+
+```bash
+uv run pytest tests/
+```
+
+## Upstream paper experiments
+
+The original paper's ARC-AGI-1/2, Sudoku-Extreme, and Maze-Hard training commands still work
+unmodified against this codebase (`arch=trm`, no queue involved):
+
+```bash
+# ARC-AGI-1 (4 GPUs, ~3 days)
 uv run pretrain-arc1
-```
 
-Or directly:
-
-```bash
-run_name="pretrain_att_arc1concept_4"
-torchrun --nproc-per-node 4 --rdzv_backend=c10d --rdzv_endpoint=localhost:0 --nnodes=1 pretrain.py \
-arch=trm \
-data_paths="[data/arc1concept-aug-1000]" \
-arch.L_layers=2 \
-arch.H_cycles=3 arch.L_cycles=4 \
-+run_name=${run_name} ema=True
-```
-
-*Runtime:* ~3 days
-
-### ARC-AGI-2 (assuming 4 H-100 GPUs):
-
-```bash
-# Using uv run
+# ARC-AGI-2 (4 GPUs, ~3 days)
 uv run pretrain-arc2
+
+# Sudoku-Extreme (1 GPU, <36h)
+uv run pretrain-sudoku-mlp-t
+uv run pretrain-sudoku-att
+
+# Maze-Hard (4 GPUs, <24h)
+uv run pretrain-maze
 ```
 
-Or directly:
+Note: you cannot train on both ARC-AGI-1 and ARC-AGI-2 and evaluate them both, since the
+ARC-AGI-2 training split contains some ARC-AGI-1 evaluation data.
 
-```bash
-run_name="pretrain_att_arc2concept_4"
-torchrun --nproc-per-node 4 --rdzv_backend=c10d --rdzv_endpoint=localhost:0 --nnodes=1 pretrain.py \
-arch=trm \
-data_paths="[data/arc2concept-aug-1000]" \
-arch.L_layers=2 \
-arch.H_cycles=3 arch.L_cycles=4 \
-+run_name=${run_name} ema=True
-```
+## Upstream & citation
 
-*Runtime:* ~3 days
+This fork is based on ["Less is More: Recursive Reasoning with Tiny Networks"](https://arxiv.org/abs/2510.04871)
+(Jolicoeur-Martineau, 2025), which itself is built on the Hierarchical Reasoning Model
+[code](https://github.com/sapientinc/HRM) and the [HRM analysis code](https://github.com/arcprize/hierarchical-reasoning-model-analysis).
+The upstream repository is [SamsungSAILMontreal/TinyRecursiveModels](https://github.com/SamsungSAILMontreal/TinyRecursiveModels).
 
-### Sudoku-Extreme (assuming 1 L40S GPU):
-
-```bash
-run_name="pretrain_mlp_t_sudoku"
-python pretrain.py \
-arch=trm \
-data_paths="[data/sudoku-extreme-1k-aug-1000]" \
-evaluators="[]" \
-epochs=50000 eval_interval=5000 \
-lr=1e-4 puzzle_emb_lr=1e-4 weight_decay=1.0 puzzle_emb_weight_decay=1.0 \
-arch.mlp_t=True arch.pos_encodings=none \
-arch.L_layers=2 \
-arch.H_cycles=3 arch.L_cycles=6 \
-+run_name=${run_name} ema=True
-
-run_name="pretrain_att_sudoku"
-python pretrain.py \
-arch=trm \
-data_paths="[data/sudoku-extreme-1k-aug-1000]" \
-evaluators="[]" \
-epochs=50000 eval_interval=5000 \
-lr=1e-4 puzzle_emb_lr=1e-4 weight_decay=1.0 puzzle_emb_weight_decay=1.0 \
-arch.L_layers=2 \
-arch.H_cycles=3 arch.L_cycles=6 \
-+run_name=${run_name} ema=True
-```
-
-*Runtime:* < 36 hours
-
-### Maze-Hard (assuming 4 L40S GPUs):
-
-```bash
-run_name="pretrain_att_maze30x30"
-torchrun --nproc-per-node 4 --rdzv_backend=c10d --rdzv_endpoint=localhost:0 --nnodes=1 pretrain.py \
-arch=trm \
-data_paths="[data/maze-30x30-hard-1k]" \
-evaluators="[]" \
-epochs=50000 eval_interval=5000 \
-lr=1e-4 puzzle_emb_lr=1e-4 weight_decay=1.0 puzzle_emb_weight_decay=1.0 \
-arch.L_layers=2 \
-arch.H_cycles=3 arch.L_cycles=4 \
-+run_name=${run_name} ema=True
-```
-
-*Runtime:* < 24 hours
-
-## Reference
-
-If you find our work useful, please consider citing:
+If you build on the original TRM or HRM work, cite the original papers:
 
 ```bibtex
 @misc{jolicoeurmartineau2025morerecursivereasoningtiny,
@@ -190,8 +187,6 @@ If you find our work useful, please consider citing:
 }
 ```
 
-and the Hierarchical Reasoning Model (HRM):
-
 ```bibtex
 @misc{wang2025hierarchicalreasoningmodel,
       title={Hierarchical Reasoning Model}, 
@@ -203,5 +198,3 @@ and the Hierarchical Reasoning Model (HRM):
       url={https://arxiv.org/abs/2506.21734}, 
 }
 ```
-
-This code is based on the Hierarchical Reasoning Model [code](https://github.com/sapientinc/HRM) and the Hierarchical Reasoning Model Analysis [code](https://github.com/arcprize/hierarchical-reasoning-model-analysis).

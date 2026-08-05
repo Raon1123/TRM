@@ -10,9 +10,10 @@ logs/
 scripts/queue/
 
 lab/
+# lab is a symlink to /mnt/ayp/agents/trm — the dir pattern lab/ won't match a symlink
+lab
 !lab/
 lab/*
-!lab/goal-graph-orchestration.md
 reports/
 research_mcp/
 scripts/

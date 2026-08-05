@@ -14,6 +14,9 @@ lab/
 lab
 !lab/
 lab/*
+
+# root-level md are working notes, not code — keep out of git (tracked README.md / goal-graph-orchestration.md unaffected)
+/*.md
 reports/
 research_mcp/
 scripts/

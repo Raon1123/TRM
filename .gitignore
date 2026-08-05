@@ -10,6 +10,9 @@ logs/
 scripts/queue/
 
 lab/
+!lab/
+lab/*
+!lab/goal-graph-orchestration.md
 reports/
 research_mcp/
 scripts/

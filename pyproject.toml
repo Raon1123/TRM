@@ -25,6 +25,8 @@ dependencies = [
   "pydantic-core>=2.41.5",
   "numba>=0.62.1",
   "triton>=3.5.1",
+  "jsonschema>=4.23.0",
+  "pyyaml>=6.0.3",
 ]
 
 [tool.setuptools.packages.find]

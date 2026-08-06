@@ -746,7 +746,7 @@ class _ScriptedModel:
     training = False
     #: Which latent fields the carry exposes, mirroring the real arch grid:
     #: "both" (trm), "z_h_only" (transformers_baseline, trm_hier6),
-    #: "z_l_only" (trm_singlez), "no_inner" (a carry shape we have not seen).
+    #: "z_l_only" (trm_singlez), "no_inner_attr" (a carry shape we have not seen).
     latent_fields = "both"
 
     def __init__(self, n_steps: int, sigma: np.ndarray, seq_len: int,
@@ -778,7 +778,12 @@ class _ScriptedModel:
         elif self.latent_fields == "z_l_only":
             carry.inner_carry = _OnlyZL(zb)
         else:
-            carry.inner_carry = None
+            # The attribute is REMOVED, not set to None.  A None-valued
+            # attribute would leave `carry.inner_carry` legal and never exercise
+            # the crash path; only a genuinely absent attribute does, which is
+            # what the frozen try/except above is catching in the first place.
+            if hasattr(carry, "inner_carry"):
+                del carry.inner_carry
         all_finish = h >= self.n_steps
         carry.halted = torch.full((self.B,), all_finish, dtype=torch.bool)
 
@@ -845,7 +850,7 @@ def test_probe_forward_pairs_each_act_step_latent_with_its_own_decode():
     # trm_singlez: only z_L exists, and it is the latent that carries the state.
     ("z_l_only", True, 0.0),
     # A carry shape with no inner_carry at all must degrade, never raise.
-    ("no_inner", False, 1.0),
+    ("no_inner_attr", False, 1.0),
 ])
 def test_new_capture_covers_the_architectures_the_frozen_paired_read_blinds(
         arch: str, expect_zseq: bool, expect_is_zh: float):

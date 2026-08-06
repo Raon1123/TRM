@@ -64,6 +64,7 @@ this work (``test_figpipe_contracts``, ``test_figure_pipeline_v3``,
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -474,6 +475,62 @@ def _decode_traj(sigma: np.ndarray, exponents: List[int],
                              ).to(torch.int16) for e in exponents]
 
 
+def _transpose_one_pair(perm: np.ndarray, seed: int) -> np.ndarray:
+    """Swap the values at two distinct positions of every row.
+
+    Because a permutation's entries are distinct, swapping two of them changes
+    EXACTLY two positions per row.  So the result disagrees with ``perm`` at
+    exactly 2 of n positions and agrees at exactly n-2 -- an agreement of
+    (n-2)/n that is exact, not statistical, which is what lets the tests below
+    assert the numeric SCALE of the agreement metric rather than only its
+    endpoints.  The result is still a valid permutation, so it also cannot be
+    rejected by the bijectivity screen.
+    """
+    rng = np.random.RandomState(seed)
+    out = perm.copy()
+    n = perm.shape[1]
+    for r in range(perm.shape[0]):
+        a, b = rng.choice(n, size=2, replace=False)
+        out[r, a], out[r, b] = out[r, b], out[r, a]
+    assert np.all((out != perm).sum(axis=1) == 2)
+    return out
+
+
+def _perm_power_naive(sigma: np.ndarray, j: int) -> np.ndarray:
+    """sigma^j by NAIVE repeated application, independent of the shipped code.
+
+    Deliberately shares no code with ``zl._perm_power`` (binary exponentiation)
+    or with the logger's incremental repeated squaring: it applies sigma one
+    step at a time, j mod ord(row) times per row.  A reference that reused the
+    implementation's own algorithm could not detect an error in that algorithm.
+
+    Reducing the exponent mod the row's own order first is what makes this
+    tractable at j = 2^15 = 32768 while remaining exact: sigma^j = sigma^(j mod
+    ord) for every row, and ord divides Landau's g(n) <= 30 at n=10.
+    """
+    N, n = sigma.shape
+    out = np.empty_like(sigma)
+    for r in range(N):
+        row = sigma[r]
+        # Order of this row = lcm of its cycle lengths, found by walking cycles.
+        seen = np.zeros(n, dtype=bool)
+        order = 1
+        for start in range(n):
+            if seen[start]:
+                continue
+            length, cur = 0, start
+            while not seen[cur]:
+                seen[cur] = True
+                cur = row[cur]
+                length += 1
+            order = int(np.lcm(order, length))
+        cur = np.arange(n, dtype=sigma.dtype)
+        for _ in range(j % order):
+            cur = row[cur]
+        out[r] = cur
+    return out
+
+
 def test_tau_separates_a_sequential_decoder_from_a_doubling_decoder():
     """The categorical question: one power per ACT step, or squaring each step?
 
@@ -514,15 +571,218 @@ def test_tau_separates_a_sequential_decoder_from_a_doubling_decoder():
         assert out_seq[f"ztau/train/agree_dbl_step_{sk}"] == 1.0
         assert out_dbl[f"ztau/train/agree_seq_step_{sk}"] == 1.0
 
+    # Separation is asserted WITH A MARGIN, not merely as "< 1.0".  A bare
+    # "< 1.0" is satisfied by a degenerate all-or-nothing indicator (1.0 on an
+    # exact match, 0.0 otherwise) -- a metric that would read 0.0/0.0 at every
+    # step of any real run and carry no discriminative content whatsoever.  The
+    # margins below say the wrong hypothesis must sit DOWN AT CHANCE while the
+    # right one sits at 1.0, which is the property the campaign actually needs.
+    # Chance agreement between two distinct powers of a random 10-permutation is
+    # ~1/n = 0.1 (measured 0.104 on this probe); 0.35 is a wide bound on that.
     for h in (3, 4):
         sk = f"{h:02d}"
-        assert out_seq[f"ztau/train/agree_dbl_step_{sk}"] < 1.0, (
-            "a sequential trajectory must NOT look like doubling at h>=3")
-        assert out_dbl[f"ztau/train/agree_seq_step_{sk}"] < 1.0, (
-            "a doubling trajectory must NOT look like sequential at h>=3")
+        wrong_dbl = out_seq[f"ztau/train/agree_dbl_step_{sk}"]
+        wrong_seq = out_dbl[f"ztau/train/agree_seq_step_{sk}"]
+        assert wrong_dbl < 0.35, (
+            "a sequential trajectory must NOT look like doubling at h>=3; "
+            f"agree_dbl={wrong_dbl} is above chance")
+        assert wrong_seq < 0.35, (
+            "a doubling trajectory must NOT look like sequential at h>=3; "
+            f"agree_seq={wrong_seq} is above chance")
+        assert out_seq[f"ztau/train/agree_seq_step_{sk}"] - wrong_dbl > 0.5
+        assert out_dbl[f"ztau/train/agree_dbl_step_{sk}"] - wrong_seq > 0.5
 
     assert out_seq["ztau/discriminable"] == 1.0
     assert out_dbl["ztau/discriminable"] == 1.0
+
+
+def test_agreement_is_graded_and_its_numeric_scale_is_pinned():
+    """The agreement keys are a POSITION FRACTION -- pinned to an exact value.
+
+    Every other tau test feeds either an exact power of sigma (agreement 1.0) or
+    uniform-random garbage (agreement ~chance), which pins only the endpoints
+    and leaves the whole middle of the range -- the regime a real, partially
+    converged model actually occupies -- undefined.  Two mutually contradictory
+    definitions survive endpoint-only tests: a row-exact rate (``.all(axis=1)``,
+    which reads 0.0 here) and any monotone rescaling (e.g. ``min(1, 2*mean)``,
+    which reads 1.0 here).  They disagree by the full range of the metric.
+
+    A decode that is sigma^h with exactly one transposition per row therefore
+    has to read exactly (n-2)/n = 0.8 -- asserted on the hypothesis columns
+    (``agree_seq``/``agree_dbl``), on a heatmap cell, and on ``best_exp_agree``,
+    so the scale is pinned wherever it is emitted and not only inside the
+    private helper.
+    """
+    n, seq_len, B, T = 10, 11, 128, 3
+    sigma, inputs, labels = _sigma_k_probe(n, seq_len, B, k=3, seed=21)
+    expected = (n - 2) / n
+    assert expected == 0.8
+
+    # h -> exponent under BOTH hypotheses at once: they coincide at h=1,2 and
+    # h=3 uses 3 (sequential), so agree_seq is the graded column at every h and
+    # agree_dbl is graded at h=1,2.
+    perturbed = [
+        torch.from_numpy(
+            _encode(_transpose_one_pair(zl._perm_power(sigma, e), seed=30 + e),
+                    seq_len)).to(torch.int16)
+        for e in (1, 2, 3)
+    ]
+    out = zl._extra_step_metrics(z_traj=[], preds_traj=perturbed,
+                                 inputs=inputs, labels=labels)
+
+    for h in range(1, T + 1):
+        sk = f"{h:02d}"
+        # The planted exponent is still identified: 0.8 beats every rival.
+        assert out[f"ztau/train/best_exp_step_{sk}"] == float(h)
+        assert out[f"ztau/train/best_exp_agree_step_{sk}"] == pytest.approx(
+            expected, abs=1e-12)
+        assert out[f"ztau/train/agree_seq_step_{sk}"] == pytest.approx(
+            expected, abs=1e-12)
+        # The heatmap cell for the planted exponent carries the same scale.
+        assert out[f"ztau/train/agree_h{sk}_j{h:02d}"] == pytest.approx(
+            expected, abs=1e-12)
+        # Two positions per row are wrong, so no row is exact.
+        assert out[f"ztau/train/exact_target_step_{sk}"] == 0.0
+
+    # agree_dbl is the same graded column while the hypotheses coincide (h=1,2),
+    # so the doubling key's scale is pinned too, not just the sequential one.
+    for h in (1, 2):
+        assert out[f"ztau/train/agree_dbl_step_{h:02d}"] == pytest.approx(
+            expected, abs=1e-12)
+
+    # A transposition preserves bijectivity, so this decode must still be a
+    # valid permutation -- the graded agreement is not an artefact of garbage.
+    assert out["zperm/train/valid_perm_step_01"] == 1.0
+
+
+def test_doubling_column_is_exact_at_every_step_of_the_deepest_campaign_arm():
+    """The doubling hypothesis, checked to T=16 against an independent oracle.
+
+    The campaign's ablation_act sweep runs halt_max_steps in {2,4,8,16}, so the
+    doubling column reaches exponent 2^15 = 32768.  Testing only to T=4 checks
+    the hypothesis no further than 2^3 = 8 and leaves the halt=8 and halt=16
+    arms -- the deep arms the whole depth question is about -- outside every
+    assertion.  Two distinct wrong implementations survive a T<=4 suite:
+
+      * skipping a squaring at any single step (correct through h=4, wrong from
+        h=5 on);
+      * indexing the precomputed power table with a CLAMPED literal exponent,
+        ``powers[min(2**(h-1), jmax)]``.  That is exact while 2^(h-1) <= g(n)=30,
+        i.e. for h<=5, and wrong from h=6 -- where it silently substitutes
+        sigma^30 for sigma^32.
+
+    Both are caught here because every step to 16 is compared against
+    ``_perm_power_naive``, which reduces mod each row's own order and applies
+    sigma one step at a time, sharing no algorithm with the implementation.
+    """
+    n, seq_len, B, T = 10, 11, 96, 16
+    sigma, inputs, labels = _sigma_k_probe(n, seq_len, B, k=3, seed=22)
+
+    dbl_exponents = [2 ** (h - 1) for h in range(1, T + 1)]
+    assert dbl_exponents[-1] == 32768
+    traj = [torch.from_numpy(_encode(_perm_power_naive(sigma, e), seq_len)
+                             ).to(torch.int16) for e in dbl_exponents]
+
+    out = zl._extra_step_metrics(z_traj=[], preds_traj=traj,
+                                 inputs=inputs, labels=labels)
+
+    for h in range(1, T + 1):
+        sk = f"{h:02d}"
+        assert out[f"ztau/train/agree_dbl_step_{sk}"] == 1.0, (
+            f"doubling column disagrees with sigma^(2^{h - 1}) at h={h}")
+
+    # ...and the sequential column must NOT also read 1.0 once the hypotheses
+    # have diverged, or "agreement 1.0 everywhere" would be vacuous.  Exponents
+    # 2^(h-1) and h coincide only at h=1,2, and past the row orders they can
+    # re-alias, so this is asserted where divergence is guaranteed.
+    for h in (3, 4, 5):
+        assert out[f"ztau/train/agree_seq_step_{h:02d}"] < 0.35
+
+    # The exhaustive grid is not silently truncated at this depth: 31 exponents
+    # x 16 steps = 496 keys, under the 1024 cap.
+    assert out["ztau/n_exponents"] == float(zl._landau_g(n) + 1)
+    assert (zl._landau_g(n) + 1) * T <= zl._TAU_MAX_AGREE_KEYS
+
+
+def test_repeated_squaring_matches_an_independent_oracle_past_the_grid():
+    """``_perm_power`` itself is exact where the exponent grid cannot reach.
+
+    The tau grid stops at Landau's g(10) = 30, but the doubling hypothesis needs
+    sigma^32768.  This pins the primitive both hypotheses are built from against
+    the naive oracle at every doubling exponent the deepest arm uses, including
+    the ones with no column in the grid.
+    """
+    n, B = 10, 64
+    sigma = _random_perms(n, B, seed=23)
+    for h in range(1, 17):
+        j = 2 ** (h - 1)
+        assert np.array_equal(zl._perm_power(sigma, j),
+                              _perm_power_naive(sigma, j)), f"exponent {j}"
+
+    # And the incremental repeated squaring the logger uses is the same object:
+    # dbl_{h+1} = dbl_h o dbl_h starting from sigma.
+    dbl = sigma.copy()
+    for h in range(1, 17):
+        assert np.array_equal(dbl, _perm_power_naive(sigma, 2 ** (h - 1)))
+        dbl = zl._perm_compose(dbl, dbl)
+
+
+def test_exact_target_honours_the_ignore_label_mask_of_real_labels():
+    """Production labels pad with IGNORE_LABEL_ID = -100, and no other test does.
+
+    ``_probe_forward`` remaps the file's pad id 0 to IGNORE_LABEL_ID before the
+    reduction ever sees the labels, so every real ``exact_target`` reading is
+    computed against a label row whose tail is -100 while the decode's tail is
+    whatever the model emitted there.  Every other test in this module builds
+    labels through ``_encode``, which pads with 0, leaving the mask all-True and
+    the masking branch completely unexercised -- a reduction that ignored the
+    mask would score a PERFECT model at 0.0 in production and 1.0 in the tests.
+    """
+    n, seq_len, B = 10, 13, 64
+    sigma, inputs, labels = _sigma_k_probe(n, seq_len, B, k=3, seed=24)
+
+    labels_prod = labels.clone()
+    labels_prod[labels_prod == 0] = zl.IGNORE_LABEL_ID
+    assert (labels_prod == zl.IGNORE_LABEL_ID).any(), "test must exercise pad"
+
+    # A perfect decode of sigma^3 that emits junk in the ignored tail, which is
+    # exactly what an unconstrained decoder does at masked positions.
+    perfect = _encode(zl._perm_power(sigma, 3), seq_len)
+    perfect[:, n:] = 7
+    traj = [torch.from_numpy(perfect).to(torch.int16)]
+
+    out = zl._extra_step_metrics(z_traj=[], preds_traj=traj,
+                                 inputs=inputs, labels=labels_prod)
+    assert out["ztau/train/exact_target_step_01"] == 1.0, (
+        "a perfect decode must score 1.0; junk at IGNORE_LABEL_ID positions is "
+        "outside the loss and must not count against it")
+
+    # And the mask must not excuse a genuine error inside the loss region.
+    wrong = perfect.copy()
+    wrong[:, 0] = (wrong[:, 0] % n) + 1
+    out_w = zl._extra_step_metrics(
+        z_traj=[], preds_traj=[torch.from_numpy(wrong).to(torch.int16)],
+        inputs=inputs, labels=labels_prod)
+    assert out_w["ztau/train/exact_target_step_01"] == 0.0
+
+
+@pytest.mark.parametrize("T, expected", [(1, 0.0), (2, 0.0), (3, 1.0), (4, 1.0)])
+def test_discriminable_flips_exactly_at_the_depth_the_hypotheses_diverge(
+        T: int, expected: float):
+    """T=2 is the boundary, and it is the campaign's halt=2 arm.
+
+    Sequential and doubling predict the same exponent at h=1 (1) and h=2 (2) and
+    first differ at h=3 (3 vs 4), so a run with T<=2 cannot distinguish them even
+    in principle.  Asserting only the far endpoints leaves the threshold free to
+    drift onto the halt=2 arm and label an undecidable run decidable -- which is
+    the single reading error this key exists to prevent.
+    """
+    n, seq_len, B = 10, 11, 32
+    sigma, inputs, labels = _sigma_k_probe(n, seq_len, B, k=2, seed=25)
+    out = zl._extra_step_metrics(
+        z_traj=[], preds_traj=_decode_traj(sigma, list(range(1, T + 1)), seq_len),
+        inputs=inputs, labels=labels)
+    assert out["ztau/discriminable"] == expected
 
 
 def test_tau_heatmap_grid_is_emitted_uncollapsed():
@@ -571,6 +831,170 @@ def test_exponent_identification_distinguishes_off_by_one_from_random():
 # --------------------------------------------------------------------------- #
 # (B) Mutual information -- bias disclosure, not accuracy
 # --------------------------------------------------------------------------- #
+
+def _mi_probe(B: int, P: int, D: int, n: int, seed: int, *,
+              deterministic: bool = False, signal: float = 0.0):
+    """(out, sigma) for one ACT step over a latent with a controlled signal.
+
+    ``deterministic`` plants position i = codes[sigma[:, i]] exactly, so the
+    symbol is recoverable with certainty and the TRUE I(sigma(i); z) is exactly
+    H(sigma(i)) = log2(n) -- the reference case for the attainable ceiling.
+    """
+    seq_len = n + 1
+    sigma, inputs, labels = _sigma_k_probe(n, seq_len, B, k=2, seed=seed)
+    torch.manual_seed(seed)
+    if deterministic:
+        Z = torch.zeros(B, P + seq_len, D)
+        codes = torch.randn(n, D)
+        for i in range(n):
+            Z[:, P + i, :] = codes[torch.from_numpy(sigma[:, i])]
+    else:
+        Z = torch.randn(B, P + seq_len, D)
+        if signal:
+            codes = torch.randn(n, D)
+            for i in range(n):
+                Z[:, P + i, :] += signal * codes[torch.from_numpy(sigma[:, i])]
+    return zl._extra_step_metrics(z_traj=[Z], preds_traj=[],
+                                  inputs=inputs, labels=labels), sigma
+
+
+def test_mi_floor_is_materially_negative_and_zero_is_not_the_reference():
+    """The bias floor is NOT ~0, and an uninformative latent sits ON it.
+
+    This is the estimator's single most misreadable property.  The naive
+    reading -- "0 bits means no information, negative means worse than the
+    marginal" -- is wrong: the cross-fit decoder's held-out cross-entropy
+    exceeds H(X) even on pure noise, so the floor is materially BELOW zero
+    (measured -1.10 bits at the production configuration B=512/D=512/n=10,
+    a third of the 3.32-bit ceiling).  Without this test the one-sided
+    ``null < 0.05`` check above is satisfied by an estimator whose floor is at
+    0, at -1, or at -100 alike, and every weakly-informative ACT step would
+    render as a meaningful plateau instead of a reading at the instrument's
+    floor.
+
+    Pinned here as: the null is strongly negative, AND a latent that carries no
+    information reads essentially the same value as the null.  Those two
+    together say "the floor is negative and it is where uninformative latents
+    land", which is exactly the fact the dashboard reader needs.  Any future
+    clipping of the estimate at zero -- the obvious "cleanup" -- fails this.
+    """
+    out, _ = _mi_probe(B=256, P=3, D=24, n=8, seed=15)
+    lb = out["zmi/train/sym_decode_lb_bits_step_01"]
+    null = out["zmi/train/sym_decode_null_bits_step_01"]
+
+    assert null < -0.3, (
+        f"null {null:+.3f} is not materially negative -- if the floor really "
+        "moved to ~0 the estimator note's reading rule must be re-derived, not "
+        "the tolerance widened")
+    assert lb < -0.3, (
+        f"an uninformative latent read {lb:+.3f}; a value at or above 0 means "
+        "the estimate is being clipped, which hides the floor")
+    assert abs(lb - null) < 0.4, (
+        f"uninformative latent ({lb:+.3f}) should sit at the shuffle floor "
+        f"({null:+.3f}); a large gap means the null is not measuring the floor")
+
+
+def test_mi_saturation_key_reports_the_attainable_not_the_mathematical_ceiling():
+    """``zmi/sym_decode_saturated_bits`` is the top endpoint of the instrument.
+
+    log2(n) is the ceiling of the ESTIMAND; this key is the ceiling of the
+    ESTIMATOR.  A latent from which the symbol is exactly recoverable has true
+    MI equal to log2(n) and yet reads materially below it, so without this key
+    that shortfall is indistinguishable on the dashboard from real model
+    shortfall.
+
+    Also pins that the value is MEASURED, not a constant: it must move with the
+    probe size, because r itself is B-dependent.  A hardcoded number (the
+    tempting "just document 2.85") fails both the ceiling gap and the
+    B-dependence assertion.
+    """
+    n, P, D = 8, 3, 24
+    ceiling = float(np.log2(n))
+
+    out_rand, _ = _mi_probe(B=256, P=P, D=D, n=n, seed=15)
+    out_det, _ = _mi_probe(B=256, P=P, D=D, n=n, seed=15, deterministic=True)
+
+    sat = out_rand["zmi/sym_decode_saturated_bits"]
+    # Emitted whenever an lb is emitted -- the value can never be read alone.
+    assert "zmi/train/sym_decode_lb_bits_step_01" in out_rand
+    assert out_det["zmi/sym_decode_saturated_bits"] == pytest.approx(sat)
+
+    assert 0.0 < sat < ceiling - 0.2, (
+        f"saturated {sat:.3f} must sit materially below the mathematical "
+        f"ceiling {ceiling:.3f}: that gap IS the finite-sample bias this key "
+        "exists to expose")
+
+    # An exactly-recoverable latent lands near the saturation point, far above
+    # an uninformative one -- i.e. the key really is the top of the range.
+    lb_det = out_det["zmi/train/sym_decode_lb_bits_step_01"]
+    lb_rand = out_rand["zmi/train/sym_decode_lb_bits_step_01"]
+    assert abs(lb_det - sat) < 0.5, (
+        f"a deterministic latent read {lb_det:.3f} against a saturation "
+        f"reference of {sat:.3f}")
+    assert lb_det > lb_rand + 1.0
+    # ...and it is still short of the mathematical ceiling, which is the whole
+    # point: the gap is the instrument, not the model.
+    assert lb_det < ceiling
+
+    # Measured, not hardcoded: halving the probe size must move it.
+    sat_small, _ = _mi_probe(B=128, P=P, D=D, n=n, seed=15)
+    assert abs(sat_small["zmi/sym_decode_saturated_bits"] - sat) > 0.25, (
+        "saturation must track the probe size; a constant would not")
+
+
+class _capture_warnings:
+    """Collect ``log.warning`` messages emitted by utils.z_logging in a block."""
+
+    def __enter__(self) -> List[str]:
+        self.records: List[str] = []
+        outer = self
+
+        class _H(logging.Handler):
+            def emit(self, record):
+                outer.records.append(record.getMessage())
+
+        self.handler = _H()
+        self.logger = zl.log
+        self.logger.addHandler(self.handler)
+        self.prev = self.logger.level
+        self.logger.setLevel(logging.WARNING)
+        return self.records
+
+    def __exit__(self, *exc):
+        self.logger.removeHandler(self.handler)
+        self.logger.setLevel(self.prev)
+        return False
+
+
+def test_mi_fold_leak_alarm_is_checked_in_code_not_only_documented():
+    """A positive null must actually raise a warning, not be silently logged.
+
+    The estimator note calls the null "a live alarm"; an alarm nothing inspects
+    is prose.  A positive null means the fold split leaked and every lb on that
+    curve stops being a bound in any direction, so it must reach the log.
+    Warning, never raising: aborting a multi-day run over a diagnostic is the
+    failure mode this module's containment design exists to prevent.
+    """
+    with _capture_warnings() as rec:
+        zl._mi_alarm_check({"01": -1.10, "02": -0.98, "03": 0.0}, "train")
+    assert rec == [], f"a non-positive null must not warn, got {rec}"
+
+    with _capture_warnings() as rec:
+        zl._mi_alarm_check({"01": -1.10, "02": +0.42}, "train")
+    assert len(rec) == 1, "a positive null must warn exactly once"
+    assert "02" in rec[0] and "fold" in rec[0].lower(), rec[0]
+
+    # Jitter around the floor is not an alarm -- the threshold sits above the
+    # null's own sampling noise, so this warns on leaks and not on noise.
+    with _capture_warnings() as rec:
+        zl._mi_alarm_check({"01": 0.02}, "train")
+    assert rec == []
+
+    # NaN (a degenerate fold) is not an alarm either.
+    with _capture_warnings() as rec:
+        zl._mi_alarm_check({"01": float("nan")}, "train")
+    assert rec == []
+
 
 def test_mi_lower_bound_is_signed_rises_with_signal_and_respects_its_ceiling():
     """Pins the estimator's DISCLOSURE properties, not its accuracy.

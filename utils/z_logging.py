@@ -443,9 +443,12 @@ def _pca_top2_var(eigenvalues: np.ndarray) -> float:
 #: z/mean_norm, z/delta_step_<t>, probe/* or phase/*.  Two independent locks.
 _SEQ_KEY_NAMESPACES = ("zseq", "zmi", "ztau", "zperm")
 
-#: Dimension of the PCA subspace the MI decoder sees.  With C=10 classes and
-#: B=512 probe rows this is ~51 samples per class in 32 dims -- the sample
-#: regime that sets the estimator's bias, hence it is logged as zmi/subspace_dim.
+#: Dimension of the PCA subspace the MI decoder sees.  The decoder is CROSS-FIT,
+#: so the sample regime that sets the estimator's bias is the FOLD, not the
+#: probe: at B=512 each fit sees B/2 = 256 rows, i.e. with C=10 classes only
+#: ~25.6 samples per class in 32 dims -- half what the probe size suggests.
+#: That is the regime behind the measured -1.10 bit floor documented in the
+#: estimator note below, hence r is logged as zmi/subspace_dim.
 _MI_SUBSPACE_DIM = 32
 #: Label-shuffle repeats for the null.  >1 so the null's own sampling noise is
 #: not read as trajectory structure.
@@ -648,18 +651,69 @@ def _pooled_pr_legacy(z: torch.Tensor) -> float:
 #    (a linear decoder) over an r=32 PCA subspace and is blind to class structure
 #    that is nonlinear or lives outside that subspace.  The value is a
 #    linear-decodability floor, not the information content.
-#  * The estimate is NOT clipped at zero.  A negative value is the honest signal
-#    that the decoder does worse than the marginal, and clipping would hide it.
-#  * zmi/train/sym_decode_null_bits_step_<hh> runs the identical estimator with
-#    the class labels shuffled, where the true MI is 0.  On held-out folds this
-#    must sit at ~0; a materially POSITIVE null is a live alarm that the fold
-#    split leaked and the bound guarantee is void.
+#  * The estimate is NOT clipped at zero.  Clipping would hide the floor
+#    described next, which is the single most misreadable property of this
+#    instrument.
+#
+# THE INSTRUMENT'S TWO ENDPOINTS ARE BOTH MEASURED, AND NEITHER IS WHERE A
+# READER WOULD ASSUME.  This is the honesty-critical paragraph; the naive
+# reading interval [0, log2(n)] is wrong at BOTH ends, by a third of the range.
+#
+# PROVENANCE OF THE NUMBERS BELOW: measured 2026-08-06 at B=512, S=27, D=512,
+# n=10 with _MI_SUBSPACE_DIM=32, _MI_ROWS_PER_DIM=8, _MI_SHRINKAGE=0.10.  They
+# are illustrative and WILL go stale if any of those constants change -- which
+# is precisely why both endpoints are also recomputed every eval and logged
+# (sym_decode_null_bits_step_<hh> and sym_decode_saturated_bits).  Trust the
+# logged keys over these literals; the literals only say what to expect.
+#
+#   FLOOR.  The shuffle null is NOT ~0.  Measured at the exact production
+#   configuration (B=512, S=27, D=512, n=10) it sits at -1.10 bits, i.e. 33% of
+#   the 3.32-bit ceiling BELOW zero, and it is stable to +-0.02 across signal
+#   levels, so it is a bias floor and not sampling noise.  Cause: the held-out
+#   cross-entropy of an r=32 shared-covariance decoder fitted on B/2=256 rows
+#   exceeds H(X) even when the labels carry no information, because the fitted
+#   class means are noise that the held-out fold does not share.  CONSEQUENCE
+#   FOR READING THE CURVE: a step reporting -1.0 bits is AT THE FLOOR, i.e.
+#   indistinguishable from "no linearly decodable information" -- it does NOT
+#   mean the latent is worse than the marginal.  Only lb materially ABOVE the
+#   null sibling logged at the same wandb step is evidence of anything.  The
+#   floor is B-dependent (measured: -1.44 at B=128, -1.11 at B=512, -0.47 at
+#   B=1024), which is why it is measured every eval instead of documented as a
+#   constant.
+#
+#   CEILING.  log2(n) = 3.32 is the mathematical ceiling, NOT the attainable
+#   one.  A latent from which the symbol is EXACTLY and deterministically
+#   recoverable -- true I = log2(10) = 3.3219 -- reads +2.85 at this probe size
+#   (measured; held-out nearest-code accuracy 1.000 confirms the truth is the
+#   ceiling).  So ~0.47 bits of any gap to 3.32 is pure finite-sample bias and
+#   is NOT model shortfall.  Rather than document 2.85 as a constant -- it moves
+#   with B, n and r -- the identical estimator is run every eval on exactly such
+#   a synthetic latent and the result is logged as
+#   zmi/sym_decode_saturated_bits.  READ lb ON THE INTERVAL
+#   [sym_decode_null_bits, sym_decode_saturated_bits], never [0, log2(n)].
+#
+#   Both endpoint keys are emitted unconditionally alongside every lb, so the
+#   value cannot be plotted without them.  A materially POSITIVE null remains a
+#   live alarm that the fold split leaked and the bound guarantee is void; that
+#   alarm is CHECKED IN CODE (see _mi_alarm_check) and warned about, not merely
+#   described here.
+#
+#  * The reported value is dominated by probe size, so it is comparable across
+#    ACT steps and across arms ONLY at equal B, n and fold seed.  Measured with
+#    an identically informative latent, varying only B: -0.05 bits at B=128
+#    against +2.84 at B=512 -- the entire dynamic range, from probe size alone,
+#    because r itself is B-dependent (see _mi_step_bits).  B and r are logged as
+#    zmi/probe_n and zmi/subspace_dim so the condition is checkable after the
+#    fact; z_probe_size is 512 in every current config.
 #  * Hard ceilings are logged as static scalars every eval so the estimate is
-#    never read without them: zmi/probe_ceiling_bits = log2(B) = 9.0 caps ANY
-#    identity-MI estimate at this probe size, and it sits BELOW the task's own
-#    log2(10!) = 21.79 bits (zmi/perm_entropy_bits).  This instrument
-#    structurally cannot measure the information content of a permutation at
-#    probe_size 512; it may only be read comparatively across ACT steps and arms.
+#    never read without them.  zmi/probe_ceiling_bits = log2(B) = 9.0 is the cap
+#    on the identity-MI quantity that is deliberately NOT emitted (see WHAT IS
+#    NOT ESTIMATED above) -- it is NOT the ceiling of any logged value, and the
+#    ceiling for the logged lb is zmi/sym_ceiling_bits = log2(n) = 3.32.  It is
+#    kept because it is the number that makes the pre-registered quantity's
+#    infeasibility legible: it sits BELOW the task's own log2(10!) = 21.79 bits
+#    (zmi/perm_entropy_bits), so this instrument structurally cannot measure the
+#    information content of a permutation at probe_size 512.
 #
 # REJECTED, and why, so nobody "simplifies" it back:
 #  * A binned MI on the leading principal component.  The leading PC ROTATES
@@ -707,9 +761,18 @@ def _heldout_decode_ce_bits(scores: np.ndarray, classes: np.ndarray,
     Gaussian (LDA) decoder: fit on one fold, score the other, average.
 
     Returns the held-out CE.  The caller forms the Barber-Agakov bound
-    H(X) - CE.  Because q is fitted without ever seeing the rows it scores, the
+    H(X) - CE.  Because q's LABELS are never fitted on the rows it scores, the
     bound's sign is guaranteed in expectation, and averaging the two folds
     averages two individually valid bounds.
+
+    ONE HONEST QUALIFICATION on that guarantee: q is transductive in z.  The
+    top-r PCA basis handed in as `scores` is computed in _mi_step_bits from the
+    full B x B Gram -- including the held-out rows -- before this function
+    splits the folds, so q = (PCA fitted on all B rows) o (LDA fitted on one
+    fold).  Only the second stage is held out.  The leak is LABEL-FREE, which is
+    why it is tolerable and why the shuffle null empirically controls it (the
+    null is negative at every B tested), but "q never sees these rows" would be
+    false and the weaker "q never sees these LABELS" is what actually holds.
 
     REGULARISATION IS FREE HERE, which is worth stating because it looks like a
     fudge factor.  Barber-Agakov holds for ANY conditional model q, so shrinking
@@ -843,6 +906,104 @@ def _mi_step_bits(G_tok: torch.Tensor, sigma: np.ndarray,
             nulls.append(H - ce0)
 
     return float(np.nanmean(lbs)), float(np.nanmean(nulls))
+
+
+def _mi_saturated_bits(sigma: np.ndarray, n_classes: int, hidden_size: int,
+                       seed: int = _MI_SEED) -> float:
+    """
+    The ATTAINABLE ceiling: what this estimator returns on a latent from which
+    the symbol is exactly and deterministically recoverable.
+
+    WHY THIS EXISTS.  log2(n) = 3.32 is the mathematical ceiling of the estimand
+    but NOT of the instrument.  Position i of the synthetic latent below is
+    literally codes[sigma[:, i]] -- a noiseless lookup table, so the true
+    I(sigma(i); z) is exactly H(sigma(i)) = log2(n) and a held-out
+    nearest-code decode is 100% accurate -- yet the estimator reports ~2.85
+    bits at B=512, n=10.  The ~0.47-bit shortfall is entirely finite-sample
+    bias of the cross-fit r-dimensional decoder, and without this key it is
+    indistinguishable on the dashboard from real model shortfall.
+
+    It is MEASURED rather than documented as a constant because it moves with
+    B, n and r (r is itself B-dependent, see _mi_step_bits), so a hardcoded 2.85
+    would silently become wrong the moment z_probe_size changed.
+
+    Together with the shuffle null this gives both endpoints of the instrument
+    at the exact configuration in play, so lb may be read on
+    [null, saturated] instead of the wrong-at-both-ends [0, log2(n)].
+
+    Deliberately reuses the SAME code path as the real measurement (same
+    _position_grams -> _mi_scores_from_gram -> _heldout_decode_ce_bits chain,
+    same fold seed, same r rule): a calibration computed by a different path
+    would not calibrate this estimator.  Costs one extra Gram and n_pos*2
+    decoder fits per eval -- ~1/5 of a single ACT step's MI cost, charged once,
+    not per step.
+
+    The codes are drawn from a FIXED seed independent of the model, so the key
+    is constant for a given (B, n, D) and any movement in it across evals of one
+    run is itself a bug signal.
+    """
+    B, n_pos = sigma.shape
+    if B < 4 or n_pos < 1 or hidden_size < 1:
+        return float("nan")
+    r = int(min(_MI_SUBSPACE_DIM, B - 1, max(2, (B // 2) // _MI_ROWS_PER_DIM)))
+    if r < 2:
+        return float("nan")
+
+    rng = np.random.RandomState(seed + 7717)
+    codes = rng.randn(n_classes, hidden_size).astype(np.float64)
+    Z = np.empty((B, n_pos, hidden_size), dtype=np.float64)
+    for i in range(n_pos):
+        Z[:, i, :] = codes[sigma[:, i].astype(np.int64)]
+
+    G_tok = _position_grams(torch.from_numpy(Z)).sum(dim=0)
+    scores = _mi_scores_from_gram(G_tok, r)
+
+    # Same fold construction as _mi_step_bits, so the two numbers are produced
+    # under an identical split and are directly comparable.
+    frng = np.random.RandomState(_MI_SEED)
+    folds = np.zeros(B, dtype=np.int64)
+    folds[frng.permutation(B)[: B // 2]] = 1
+
+    lbs = []
+    for i in range(n_pos):
+        cls = sigma[:, i].astype(np.int64)
+        H = _entropy_bits(cls, n_classes)
+        lbs.append(H - _heldout_decode_ce_bits(scores, cls, n_classes, folds))
+    return float(np.nanmean(lbs))
+
+
+#: A shuffle null above this many bits is treated as a fold leak.  The null is a
+#: bound on ZERO, so any materially positive value voids the sign guarantee.
+#: Set above the null's own sampling jitter (measured +-0.02 bits at B=512
+#: across signal levels) with a wide margin, so this warns on a real leak rather
+#: than on noise.
+_MI_NULL_LEAK_WARN_BITS = 0.10
+
+
+def _mi_alarm_check(nulls_by_step: Dict[str, float], split: str) -> None:
+    """
+    Actually CHECK the fold-leak alarm the estimator note advertises.
+
+    The null being "a live alarm" is worthless if nothing ever looks at it: a
+    positive null in production means the fold split leaked and every lb on that
+    curve is no longer a bound in any direction, and silently logging the number
+    would leave that discovery to whoever happens to plot the null months later.
+    Warn, never raise -- an exception here would abort a multi-day training run
+    over a diagnostic, which is exactly the failure mode this module's
+    containment design exists to prevent.
+    """
+    bad = {k: v for k, v in nulls_by_step.items()
+           if np.isfinite(v) and v > _MI_NULL_LEAK_WARN_BITS}
+    if bad:
+        worst = max(bad, key=lambda k: bad[k])
+        log.warning(
+            "z_logging: MI fold-leak alarm -- zmi/%s shuffle null is positive "
+            "at %d/%d ACT step(s) (worst: step %s = %+.3f bits > %.2f). The "
+            "labels carry no information there, so the null must be <= 0; a "
+            "positive null means the fold split leaked and sym_decode_lb_bits "
+            "is NOT a valid bound on this run.",
+            split, len(bad), len(nulls_by_step), worst, bad[worst],
+            _MI_NULL_LEAK_WARN_BITS)
 
 
 # ---------------------------------------------------------------------------
@@ -1050,6 +1211,9 @@ def _extra_step_metrics(z_traj: list,
     small held-out decoder fits (numpy, CPU-bound wherever the latents live)
     and one 512x512 eigh per ACT step; the participation ratios are nearly free
     because they use the trace form rather than an eigendecomposition.
+    The MI saturation calibration adds a measured 0.27 s ONCE per eval (not per
+    ACT step) at that shape -- about 1/5 of a single step's MI cost -- and is
+    independent of halt_max_steps.
     """
     out: Dict[str, float] = {}
 
@@ -1066,6 +1230,7 @@ def _extra_step_metrics(z_traj: list,
     # ------------------------------------------------------------------ #
     # (A) Full-sequence participation ratio, per ACT step
     # ------------------------------------------------------------------ #
+    mi_nulls: Dict[str, float] = {}
     zs = [z for z in z_traj if z is not None]
     if z_traj and len(zs) == len(z_traj) and B >= 3:
         S = z_traj[0].shape[1]
@@ -1126,9 +1291,12 @@ def _extra_step_metrics(z_traj: list,
                 # Named for the estimator ("decode" = held-out linear decode)
                 # and for the estimand ("sym" = per-symbol surrogate, NOT input
                 # identity).  Always emitted with its null sibling at the same
-                # wandb step so the value cannot be read without its bias floor.
+                # wandb step so the value cannot be read without its bias floor
+                # -- which is materially NEGATIVE (~-1.10 bits at production
+                # shape), not ~0.  See the estimator note.
                 out[f"zmi/{split}/sym_decode_lb_bits_step_{sk}"] = lb
                 out[f"zmi/{split}/sym_decode_null_bits_step_{sk}"] = null
+                mi_nulls[sk] = null
                 # NO "debiased = lb - null" key, deliberately.  For an UNSIGNED
                 # plug-in estimator the shuffle null is the bias floor and the
                 # difference is the thing to read; for a signed lower bound it
@@ -1138,7 +1306,20 @@ def _extra_step_metrics(z_traj: list,
                 # bound in either direction -- a bits-valued key in an MI
                 # namespace that overshoots its ceiling is exactly the kind of
                 # hidden limitation this metric family exists to avoid.  Read
-                # the lb; use the null only as the fold-leak alarm.
+                # the lb against the two MEASURED endpoints (null below,
+                # sym_decode_saturated_bits below); use the null additionally as
+                # the fold-leak alarm.
+
+        # ATTAINABLE ceiling, measured once per eval on a latent from which the
+        # symbol is exactly recoverable.  Emitted under exactly the condition
+        # that produces lb keys, so an lb can never appear without it.
+        if sigma is not None:
+            out["zmi/sym_decode_saturated_bits"] = _mi_saturated_bits(
+                sigma, n, int(z_traj[0].shape[2]))
+
+    # The alarm the estimator note advertises is checked, not just described.
+    if mi_nulls:
+        _mi_alarm_check(mi_nulls, split)
 
     # Static MI ceilings.  Emitted whenever the probe shape is known, even if no
     # latent was captured, so the degeneracy of the pre-registered quantity is

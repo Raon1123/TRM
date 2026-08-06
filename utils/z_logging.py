@@ -255,12 +255,19 @@ def _probe_forward(model: torch.nn.Module, probe: Dict[str, torch.Tensor],
                     # getattr, never attribute access.
                     inner = getattr(carry, "inner_carry", None)
                     raw = getattr(inner, "z_H", None)
-                    if raw is None:
-                        extra_latent_is_z_h = False
+                    if isinstance(raw, torch.Tensor):
+                        extra_z_traj.append(raw.detach().float())
+                    else:
                         raw = getattr(inner, "z_L", None)
-                    extra_z_traj.append(
-                        raw.detach().float()
-                        if isinstance(raw, torch.Tensor) else None)
+                        if isinstance(raw, torch.Tensor):
+                            # Flipped ONLY when a z_L was really substituted, so
+                            # zseq/latent_is_z_h means what its name says.  A
+                            # carry with no latent at all leaves it untouched
+                            # rather than claiming "the latent is z_L".
+                            extra_latent_is_z_h = False
+                            extra_z_traj.append(raw.detach().float())
+                        else:
+                            extra_z_traj.append(None)
 
             if all_finish:
                 break

@@ -713,6 +713,18 @@ class _InnerCarry:
         self.z_L = z_L
 
 
+class _OnlyZH:
+    """transformers_baseline / trm_hier6: a z_H with no plain ``z_L`` sibling."""
+    def __init__(self, z_H: torch.Tensor) -> None:
+        self.z_H = z_H
+
+
+class _OnlyZL:
+    """trm_singlez: the InnerCarry declares only ``z_L``."""
+    def __init__(self, z_L: torch.Tensor) -> None:
+        self.z_L = z_L
+
+
 class _Carry:
     def __init__(self, B: int) -> None:
         self.step = 0
@@ -732,6 +744,10 @@ class _ScriptedModel:
     """
 
     training = False
+    #: Which latent fields the carry exposes, mirroring the real arch grid:
+    #: "both" (trm), "z_h_only" (transformers_baseline, trm_hier6),
+    #: "z_l_only" (trm_singlez), "no_inner" (a carry shape we have not seen).
+    latent_fields = "both"
 
     def __init__(self, n_steps: int, sigma: np.ndarray, seq_len: int,
                  P: int, D: int) -> None:
@@ -754,8 +770,15 @@ class _ScriptedModel:
         h = carry.step
         z = _latent_with_planted_pr(self.B, self.P, self.seq_len, self.D,
                                     rank=h, seed=1000 + h)
-        carry.inner_carry = _InnerCarry(z_H=z.to(torch.bfloat16),
-                                        z_L=(z * 0.5).to(torch.bfloat16))
+        zb = z.to(torch.bfloat16)
+        if self.latent_fields == "both":
+            carry.inner_carry = _InnerCarry(z_H=zb, z_L=(z * 0.5).to(torch.bfloat16))
+        elif self.latent_fields == "z_h_only":
+            carry.inner_carry = _OnlyZH(zb)
+        elif self.latent_fields == "z_l_only":
+            carry.inner_carry = _OnlyZL(zb)
+        else:
+            carry.inner_carry = None
         all_finish = h >= self.n_steps
         carry.halted = torch.full((self.B,), all_finish, dtype=torch.bool)
 
@@ -810,6 +833,48 @@ def test_probe_forward_pairs_each_act_step_latent_with_its_own_decode():
     # The decode trajectory is captured for the snapshot at (T, B, seq_len).
     assert result["preds_traj"].shape == (T, 40, 7)
     assert result["preds_traj"].dtype == torch.int16
+
+
+@pytest.mark.parametrize("arch,expect_zseq,expect_is_zh", [
+    # trm: both fields -> the frozen paired read succeeds, we reuse its tensor.
+    ("both", True, 1.0),
+    # transformers_baseline / trm_hier6: z_H present, plain z_L absent.  The
+    # frozen block discards BOTH and emits no z metrics for these cohorts; the
+    # new capture recovers the z_H that was there all along.
+    ("z_h_only", True, 1.0),
+    # trm_singlez: only z_L exists, and it is the latent that carries the state.
+    ("z_l_only", True, 0.0),
+    # A carry shape with no inner_carry at all must degrade, never raise.
+    ("no_inner", False, 1.0),
+])
+def test_new_capture_covers_the_architectures_the_frozen_paired_read_blinds(
+        arch: str, expect_zseq: bool, expect_is_zh: float):
+    """Independent getattr per field, without repairing the frozen paired read.
+
+    Repairing the frozen block would start emitting ``z/eff_rank`` for cohorts
+    that have never had it, which changes what a frozen key means for those
+    runs -- so the frozen block stays byte-identical and only the NEW capture
+    reads each field separately.  The frozen keys must therefore stay ABSENT
+    for these architectures while the new ones appear.
+    """
+    T = 2
+    model, probe = _scripted_setup(n_steps=T)
+    model.latent_fields = arch
+
+    result = zl._probe_forward(model, probe, device="cpu", compute_extra=True)
+    extra = result["extra_metrics"]
+
+    # The frozen contract is untouched: z_H/z_L stay None whenever the paired
+    # read could not satisfy BOTH fields, exactly as before this work.
+    if arch != "both":
+        assert result["z_H"] is None and result["z_L"] is None
+
+    assert extra["zseq/status_ok"] == 1.0
+    assert extra["zseq/latent_is_z_h"] == expect_is_zh
+    assert ("zseq/train/pr_joint_tok_step_01" in extra) is expect_zseq
+    # Decode-only families survive every architecture.
+    assert extra["ztau/train/agree_seq_step_01"] == 1.0
+    assert extra["zperm/train/valid_perm_final"] == 1.0
 
 
 def test_single_act_step_emits_one_honest_point_and_fabricates_no_trajectory():

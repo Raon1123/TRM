@@ -247,12 +247,20 @@ def _probe_forward(model: torch.nn.Module, probe: Dict[str, torch.Tensor],
                 if reused is not None:
                     extra_z_traj.append(reused)
                 else:
-                    raw = getattr(carry.inner_carry, "z_H", None)
+                    # `carry.inner_carry` itself may be absent -- the frozen
+                    # block above swallows that as AttributeError, so this path
+                    # must not assume the attribute exists or a carry shape we
+                    # have not seen would raise INSIDE the ACT loop, outside any
+                    # guard, and take the probe (and the run) down.  Chained
+                    # getattr, never attribute access.
+                    inner = getattr(carry, "inner_carry", None)
+                    raw = getattr(inner, "z_H", None)
                     if raw is None:
                         extra_latent_is_z_h = False
-                        raw = getattr(carry.inner_carry, "z_L", None)
+                        raw = getattr(inner, "z_L", None)
                     extra_z_traj.append(
-                        raw.detach().float() if raw is not None else None)
+                        raw.detach().float()
+                        if isinstance(raw, torch.Tensor) else None)
 
             if all_finish:
                 break
@@ -1026,6 +1034,15 @@ def _extra_step_metrics(z_traj: list,
       * probe not permutation-shaped, or k not found -> ztau/*, zperm/* and the
         symbol-wise zmi/* omitted.
       * model in train mode -> ztau/* and zperm/* omitted (see below).
+
+    MEASURED COST at the largest configuration this can meet (B=512, S=27,
+    D=512, n=10, halt_max_steps=16): 3.6 s per eval on GPU, 14 s on CPU,
+    producing 750 keys.  At halt_max_steps=1 -- every historical fig1_*
+    checkpoint -- it is ~0.2 s.  Charged once per eval, on the train probe
+    only, inside bench.event_span("zprobe").  The dominant terms are the ~1600
+    small held-out decoder fits (numpy, CPU-bound wherever the latents live)
+    and one 512x512 eigh per ACT step; the participation ratios are nearly free
+    because they use the trace form rather than an eigendecomposition.
     """
     out: Dict[str, float] = {}
 

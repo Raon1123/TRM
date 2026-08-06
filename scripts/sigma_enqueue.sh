@@ -13,14 +13,66 @@
 # Usage:
 #   scripts/sigma_enqueue.sh [run_prefix]              # write job files
 #   scripts/sigma_enqueue.sh --dry-run [run_prefix]    # print grid, write nothing
+#   scripts/sigma_enqueue.sh [run_prefix] --dry-run    # same; order does not matter
+#
+# WARNING: with no --dry-run this writes real job bodies into scripts/queue/jobs/,
+# where the runner can claim them immediately.  --dry-run is accepted in any
+# position and an unrecognised flag aborts rather than being read as a prefix.
 #
 # Re-running appends after existing jobs (sequence numbers continue), so you
 # can enqueue more sweeps while the runner is going.
 
 set -euo pipefail
 
+# ---------------------------------------------------------------------------
+# Argument parsing.
+#
+# --dry-run is honoured in ANY position, and an unrecognised flag is a HARD
+# ERROR rather than a run prefix.  Both halves matter, and the reason is an
+# incident, not a style preference:
+#
+#   2026-08-06, `sigma_enqueue.sh pp --dry-run` was run intending a dry run.
+#   The old parser tested only "$1" for --dry-run, so "pp" became RUN_PREFIX,
+#   "--dry-run" was silently ignored as a stray argument, DRY_RUN stayed 0, and
+#   216 real job bodies were written into the live scripts/queue/jobs/ where
+#   they sat claimable by the runner for ~39 s before being pulled back out.
+#
+# A silently-swallowed flag on a script whose default action is "enqueue real
+# training jobs" is a one-keystroke path to an unintended production launch, so
+# anything starting with "-" that is not understood now stops the script.
+# ---------------------------------------------------------------------------
 DRY_RUN=0
-[[ "${1:-}" == "--dry-run" ]] && { DRY_RUN=1; shift; }
+_positional=()
+while (( $# )); do
+    case "$1" in
+        --dry-run) DRY_RUN=1 ;;
+        -h|--help)
+            # Print the leading comment block by STRUCTURE, not by a hardcoded
+            # line range: a range goes stale the moment the header is edited
+            # (and silently truncates the queue-writing warning mid-sentence,
+            # which is the one line a --help reader most needs to see).
+            awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' \
+                "$0" >&2
+            exit 0
+            ;;
+        --) shift; _positional+=("$@"); break ;;
+        -*)
+            echo "ERROR: unknown option '$1'." >&2
+            echo "       Refusing to continue: this script ENQUEUES REAL TRAINING" >&2
+            echo "       JOBS by default, and treating an unrecognised flag as a run" >&2
+            echo "       prefix is how 216 jobs were once enqueued by a command that" >&2
+            echo "       was meant to be a dry run.  Did you mean --dry-run?" >&2
+            exit 2
+            ;;
+        *) _positional+=("$1") ;;
+    esac
+    shift
+done
+if (( ${#_positional[@]} > 1 )); then
+    echo "ERROR: expected at most one run prefix, got: ${_positional[*]}" >&2
+    exit 2
+fi
+set -- "${_positional[@]+"${_positional[@]}"}"
 DRY_RUN_SHOW_BODY="${DRY_RUN_SHOW_BODY:-0}"
 
 QUEUE_DIR="${QUEUE_DIR:-scripts/queue}"
@@ -43,10 +95,62 @@ prefix=""
 #   fixed across all: arch.L_layers=2, arch.halt_max_steps=1  (matches legacy fig1)
 # Single seed (=1) for a fast grid; add 2 3 to SEEDS later for min/max bands.
 
-WANDB_PROJECT="Sigma_k_new"
-K_LIST=(3 4 5 6 7 8 10)
-SEEDS=(1)
-DATA_ROOT="data/sigma_k_10"          # canonical n=10, ord(σ)>k-clean (EXP-007 fixed)
+# Campaign identity. Every value here is env-overridable so a re-target does not
+# need a source edit:  WANDB_PROJECT=... K_LIST="3 4" ./sigma_enqueue.sh
+#
+# 2026-08-06: default project moved Sigma_k_new -> power_permutation. The old
+# name now denotes a SEALED generation (see
+# scripts/queue/sealed-20260806-pre-power-permutation/README.md); nothing new
+# should be written into it. wandb's `project` is flat, so campaign arms are
+# separated by RUN_GROUP (wandb group), not by more project names.
+WANDB_PROJECT="${WANDB_PROJECT:-power_permutation}"
+RUN_GROUP="${RUN_GROUP:-}"           # per-stage default assigned at emit time
+
+# 2026-08-06: extended to EVERY k directory that exists under D0 (user
+# decision "1부터 전부로 D0 확장"). All 14 are content-verified clean --
+# min ord(sigma) = the smallest order actually achievable above k, and
+# frac(ord<=k) = 0.000 in both train and test for every one of them.
+#
+# The achievable orders in S_10 are {1,2,...,10,12,14,15,20,21,30}, which
+# makes the pools coarser as k grows and produces two facts worth knowing
+# before reading any k-sweep as a smooth curve:
+#   k=1   -> ord>1  : sigma^1 = sigma, an identity-copy task; near-trivial.
+#   k=9   -> ord>9  : {10,12,14,15,20,21,30}
+#   k=10  -> ord>10 : {12,14,15,20,21,30}
+#   k=11  -> ord>11 : {12,14,15,20,21,30}  <-- IDENTICAL to k=10, because
+#           S_10 has NO permutation of order 11 (11 is prime > 10). k=11 is a
+#           same-distribution exponent comparison against k=10, not new data.
+#   k=12  -> ord>12 : {14,15,20,21,30}
+#   k=16  -> ord>16 : {20,21,30}
+#   k=20  -> ord>20 : {21,30}      <-- narrowest pool in the sweep
+# So k=10/k=11 are a matched pair, and k>=12 progressively narrows the
+# distribution rather than merely raising difficulty.
+K_LIST=(${K_LIST:-1 2 3 4 5 6 7 8 9 10 11 12 16 20})
+SEEDS=(${SEEDS:-1})
+
+# ---- Staged (one-factor-at-a-time) exploration, 2026-08-06 ----------------
+# Replaces "enqueue the whole 378-cell cartesian product at once".
+#
+# Why. The full product spends most of its budget on cells whose answer is
+# already implied by cheaper ones: k=1 is an identity-copy task, k=10 and k=11
+# draw from an IDENTICAL pool (S_10 has no order-11 element), and the k>=12
+# pools narrow monotonically. Meanwhile the phenomena actually under
+# investigation -- the H-collapse band and the L3 non-monotonicity -- sit in a
+# narrow mid-k window. A grid answers every question at the same low
+# resolution; running one factor at a time answers the load-bearing ones first
+# and lets each stage choose the next stage's k values.
+#
+# K_DIAG = the diagnostic k set the ABLATION stages sweep, deliberately much
+# smaller than K_LIST. The default brackets the observed transition: 3 is
+# reliably learnable, 5/6/7 is where collapse and non-monotonicity appear, 10
+# is the far end. Override once stage 1 has told you where the real boundary
+# is on THIS data generation -- that is the entire point of staging.
+K_DIAG=(${K_DIAG:-3 5 6 7 10})
+
+# The single reference cell every ablation perturbs by exactly one factor.
+# Matches the legacy fig1 baseline (tf = attention block, z-carry, iterating).
+BASELINE_COHORT="${BASELINE_COHORT:-tf_z_iter}"
+DATA_ROOT="${DATA_ROOT:-data/sigma_k_10}"   # canonical n=10, ord(σ)>k-clean (EXP-007 fixed)
 
 # Protocol-matched to legacy fig1 all_config.yaml (Sigma_k_fig12), verified 2026-07-21:
 #   eval_interval=2000 (NOT 5000), log_z_dynamics=True (gates probe/test_exact —
@@ -54,7 +158,72 @@ DATA_ROOT="data/sigma_k_10"          # canonical n=10, ord(σ)>k-clean (EXP-007 
 #   checkpoint_every_eval=False (cfg default True would checkpoint every eval).
 # (+ prefix: log_z_dynamics / z_snapshot are pretrain.py pydantic fields NOT in
 #  cfg_pretrain.yaml — Hydra struct mode rejects bare overrides for absent keys.)
-common_args="epochs=100000 eval_interval=2000 lr=1e-4 puzzle_emb_lr=1e-4 weight_decay=1.0 puzzle_emb_weight_decay=1.0 +log_z_dynamics=True +z_snapshot=False checkpoint_every_eval=False"
+# 2026-08-06: z_snapshot flipped False -> True for the power_permutation
+# generation. Rationale (design doc §4.2b): the open question is whether an
+# H-collapse cell (train_exact~1.0, test_exact~0.0) is ALSO a representational
+# collapse (low participation ratio) or a purely accuracy-side failure.
+# `z/eff_rank` = PR(z_H) already answers that and is already logged -- the only
+# thing missing was that the snapshot path was switched off. This is additive
+# telemetry: z_snapshot only controls whether snapshots are written to
+# checkpoint_path (pretrain.py `_snap_path`), it does not alter training or any
+# existing metric. Legacy fig1 protocol-match is therefore preserved for every
+# metric the old figures consume.
+# 2026-08-06: per-eval prediction dump ENABLED (eval_save_outputs).
+# Requested by intake 20260806T052122Z-c65f6d6d0f, which asks for a raw
+# per-eval prediction artifact so that E_comm, valid-permutation rate and the
+# d(k) trivial-position split can be computed ENTIRELY DOWNSTREAM -- keeping
+# server-side metric code at zero lines. No new code was needed: the machinery
+# already exists and was merely inert, gated on this one empty list.
+#   models/losses.py:63    preds = argmax(logits)
+#   models/losses.py:100   filtered to return_keys
+#   pretrain.py:531-535    collects any key named in eval_save_outputs
+#   pretrain.py:558-565    torch.save -> checkpoint_path/step_<N>_all_preds.<rank>
+# It fires inside evaluate(), so it is independent of checkpoint_every_eval:
+# dumps land at EVERY eval interval even though full weights are only written
+# at the final iteration.
+# Keys chosen: preds/labels/inputs/puzzle_identifiers -- enough to make each
+# dump self-describing without a join back to the dataset. Deliberately NOT
+# `logits` (vastly larger, and every requested statistic needs only the decoded
+# sequence). Cost ~136 KB/eval, ~7 MB/run, ~2.6 GB across the 378-job grid.
+# 2026-08-06: epochs 100000 -> 50000 (grid-search budget).
+# `epochs` is NOT the optimizer step count. pretrain.py derives
+#   total_steps = epochs * total_groups * mean_puzzle_examples / global_batch_size
+# and with total_groups=5000, mean_puzzle_examples=1.0 (dataset.json) and
+# global_batch_size=2048 (config/cfg_pretrain.yaml):
+#   50000 -> 122,070 steps    (100000 -> 244,140;  10000 -> only 24,414)
+# NOTE eval_interval is in EPOCHS, not steps (pretrain.py:717), so
+# eval_interval=2000 gives epochs/2000 evaluations: 25 here, 50 before.
+#
+# Why 50000 and not less. Empirically, from the 31 runs in
+# reports/figures/2026-08-04_ablation-backlog/ablation_terminal.csv that reached
+# peak_test_exact >= 0.99, the step at which they peaked is strongly structured
+# BY k -- and truncation therefore is not uniform noise, it is a k-dependent
+# bias that manufactures a fake k-curve:
+#     budget      k=5    k=6    k=7    total captured
+#     24,414 st   0/3    0/3    0/4    15/31  (48%)   <- kills mid-k entirely
+#     48,828 st   1/3    2/3    1/4    22/31  (71%)
+#     97,656 st   1/3    3/3    3/4    28/31  (90%)
+#    122,070 st   3/3    3/3    3/4    30/31  (97%)   <- this budget
+# k=5 (median peak 107,404 steps) only becomes whole at this budget, and k=5 is
+# precisely the cell where the L3 non-monotone collapse was observed -- a
+# shorter budget would kill the one cell the campaign most wants to read.
+# The single remaining loss is one k=7 run peaking at 161,106; re-run that cell
+# individually at a longer budget if it matters.
+# Cost: ~1,142 GPU-h for the 378-job grid (~12 days on 4 GPUs), half of the
+# 100000-epoch budget.
+# CAVEAT: those 52 abl_* runs are cloud-only, so their data_epoch is `unknown`
+# (not confirmed clean). The peak_step distribution is used here only as a
+# measure of how long this task/architecture takes to converge, which is
+# argued to be usable regardless of the ord-filter contamination question.
+# NOTE the `+` on eval_save_outputs. It is a PretrainConfig field
+# (pretrain.py `eval_save_outputs: List[str] = []`) but is NOT declared in
+# config/cfg_pretrain.yaml, so Hydra's struct mode rejects a bare assignment
+# with "Could not override 'eval_save_outputs' ... not in struct" and the job
+# dies before the first step. Same reason log_z_dynamics/z_snapshot carry `+`.
+# Caught 2026-08-06 by `--cfg job` pre-flight on a real enqueued body; the key
+# was added to this line earlier the same day without the prefix, which would
+# have failed every job in the campaign at launch.
+common_args="${COMMON_ARGS:-epochs=50000 eval_interval=2000 lr=1e-4 puzzle_emb_lr=1e-4 weight_decay=1.0 puzzle_emb_weight_decay=1.0 +log_z_dynamics=True +z_snapshot=True checkpoint_every_eval=False +eval_save_outputs=[inputs,labels,preds,puzzle_identifiers]}"
 
 # tag | arch | mlp_t | H_cycles | L_cycles
 #
@@ -85,19 +254,91 @@ COHORT_TIERS=(tf mlp)
 # the pre-fig1 exploratory sweep (halt {8,16}, H {6}, L {3}).  Cells equal to
 # the baseline itself are already covered by fig1 — not re-enqueued.
 #   tag | extra arch overrides (vs baseline)
-TRM_ABLATIONS=(
+# 2026-08-06: the single TRM_ABLATIONS list was split along the two axes the
+# campaign actually reasons about, so each lands in its own wandb group and can
+# be enqueued independently (STAGES="ablation_act" vs "ablation_arch").
+# Union of the two below == the pre-split list plus the finer ACT rungs.
+
+# --- ACT / halting axis (adaptive computation time: how many halt steps) ------
+# The old list only had halt=8 and 16 against the fig1 baseline halt=1, leaving
+# a 1 -> 8 gap with nothing in it. halt2/halt4 fill it so a monotone-in-halt
+# claim can actually be checked rather than interpolated across one octave.
+ACT_ABLATIONS=(
+    "halt2|arch.halt_max_steps=2"
+    "halt4|arch.halt_max_steps=4"
     "halt8|arch.halt_max_steps=8"
     "halt16|arch.halt_max_steps=16"
+)
+
+# --- model-structure axis (recurrence depth / width) --------------------------
+# H_cycles = outer recurrence, L_cycles = inner, L_layers = block depth.
+# L3 is retained because it is the one cell with a KNOWN non-monotone failure
+# (k=5,6 collapsed while k=3,4,7,8,10 reached 1.0) -- see design doc §4.1.
+ARCH_ABLATIONS=(
     "H6|arch.H_cycles=6"
+    "H1|arch.H_cycles=1"
     "L3|arch.L_cycles=3"
+    "L12|arch.L_cycles=12"
+    "lay1|arch.L_layers=1"
+    "lay4|arch.L_layers=4"
 )
 # transformers_baseline depth/width ablation (old TRANSFORMER_SWEEP grid).
 # arch.halt_max_steps=1 pinned — tfb yaml defaults to 16, which the old sweep
 # left in place (protocol mismatch vs fig1); here every run is halt=1.
-TFB_LAYERS=(1 2 6)
-TFB_CYCLES=(1 6)
+TFB_LAYERS=(${TFB_LAYERS:-1 2 6})
+
+# 2026-08-06 — TFB_CYCLES REMOVED. `arch.H_cycles` is a NO-OP for
+# arch=transformers_baseline: in models/recursive_reasoning/transformers_baseline.py
+# the identifier occurs exactly twice, at the docstring (L7, "REMOVED inner
+# cycles (no H_cycles/L_cycles loops within reasoning)") and the pydantic field
+# declaration (L52). The only range() in the file is over H_layers (L168), and
+# Model_ACTV2ReasoningModule.forward (L109-116) applies each layer once with no
+# cycle loop. So the old cyc1/cyc6 sweep built IDENTICAL models and burned half
+# its budget on duplicates.
+#
+# What that accident may have measured is worth keeping. `abl_tfb_lay2_cyc1_k3_s1`
+# and `abl_tfb_lay2_cyc6_k3_s1` reached final_test_exact 0.980 vs 0.164 (peak 1.0
+# both). H_cycles occurs 0 times in pretrain.py / utils/ / models/layers.py /
+# models/common.py -- only in the arch YAMLs, where transformers_baseline.yaml:9
+# says "H_cycles: 1  # kept for compatibility" -- so parameter count, init path,
+# LR schedule and total_steps are all independent of it, and the two runs were
+# structurally the same model.
+# CAVEAT: both runs are cloud-only (no local wandb dir, no local checkpoint), so
+# their all_config.yaml could NOT be diffed directly, and "same seed" rests on
+# the ablation CSV's seed column. Treat the 0.980/0.164 gap as strong evidence
+# of run-to-run nondeterminism, not as confirmed.
+# Either way the cycles axis had to go (it is a no-op), and spending that budget
+# on a real seed axis is right under both readings: if the variance is real the
+# seeds are required, and if it is not, the repeats explain what actually
+# differed.
+TFB_SEEDS=(${TFB_SEEDS:-1 2 3})
+
+# CELL_ID is set by each stage before calling emit_job (see the stages below)
+# and is emitted into the run config verbatim. It is the machine-readable grid
+# coordinate; run_name remains the human-facing label. Intake
+# 20260806T052122Z-c65f6d6d0f asked for `k{K}_z{0|1}_it{0|1}_N{N}_s{SEED}`,
+# which only spans the old fig1 tau-grid axes and cannot express the halt/H/L/
+# lay/tfb ablation arms at all -- so the intent (mechanical run -> cell
+# mapping) is preserved here in a form that covers every arm.
+CELL_ID=""
 
 # emit_job <run_name> <arch> <k> <seed> <arch_args...>
+#
+# NOTE the '"..."' nesting on +cell_id, which is NOT cosmetic.  The value is a
+# comma-separated key=value string ("arm=baseline,block=tf,z=1,..."), and Hydra
+# parses each override's VALUE with its own grammar, in which a bare inner '='
+# is a syntax error:
+#
+#     +cell_id=arm=baseline,block=tf,...
+#       -> "mismatched input '=' expecting <EOF>"
+#
+# A plain "${CELL_ID}" does not help, because the job body is a bash script:
+# bash strips those quotes and execs argv WITHOUT them, so Hydra still sees the
+# bare form.  The quotes have to survive bash and reach Hydra, hence single
+# quotes wrapping double quotes.  Verified with `--cfg job`: the parsed value
+# is the clean string 'arm=baseline,block=tf,k=5,s=1', no quotes retained.
+# The other +key="..." lines below are safe unquoted (no '=' or ',' in their
+# values) and are left as they are so this comment marks the one real hazard.
 emit_job() {
     local run_name="$1" arch="$2" k="$3" s="$4"; shift 4
     enqueue "$run_name" <<EOF
@@ -108,7 +349,9 @@ uv run pretrain.py arch=${arch} ${common_args} \\
     seed=${s} \\
     +k=${k} \\
     +project_name="${WANDB_PROJECT}" \\
+    +run_group="${RUN_GROUP}" \\
     +run_name="${run_name}" \\
+    +cell_id='"${CELL_ID}"' \\
     ema=True
 EOF
 }
@@ -221,7 +464,44 @@ EOF
 # Which stage groups to emit — space-separated subset of "fig1 ablation".
 # Lets two machines split the grid cleanly (e.g. STAGES=fig1 on one host,
 # STAGES=ablation on another) without touching the grid definitions above.
-STAGES="${STAGES:-fig1 ablation}"
+# 2026-08-06: "ablation" split into ablation_act / ablation_arch / tfb (each its
+# own wandb group). The bare legacy token "ablation" is still accepted and
+# expands to all three, so any existing caller keeps its old meaning.
+# 2026-08-06: the DEFAULT is now stage 1 alone, not the whole product.
+# Running `sigma_enqueue.sh pp` used to emit 378 jobs; it now emits 14 -- the
+# baseline k-sweep. Each later stage is enqueued deliberately, after reading
+# the previous one:
+#
+#   STAGES=baseline       14 jobs   baseline cohort across the full K_LIST.
+#                                   Establishes WHERE the task breaks on this
+#                                   data generation. Everything downstream
+#                                   picks its k values from this result.
+#   STAGES=seedvar        ~10 jobs  seeds 2,3 on K_DIAG for the baseline only.
+#                                   Answers "is a single-seed cell readable at
+#                                   all?" -- and there is direct reason to
+#                                   doubt it: two runs of an identical config
+#                                   at the same seed reached final_test_exact
+#                                   0.980 vs 0.164 (see the TFB_SEEDS note).
+#                                   If dispersion is large, EVERY single-seed
+#                                   comparison below is uninterpretable and
+#                                   the campaign must widen seeds before
+#                                   spending anything on ablations.
+#   STAGES=ablation_act   20 jobs   halt in {2,4,8,16} on K_DIAG. The ONLY
+#                                   stage that yields a per-ACT-step
+#                                   trajectory, so it is the only substrate
+#                                   for the tau(h)/PR(h)/MI(h) instrumentation.
+#   STAGES=ablation_arch  30 jobs   one architecture factor at a time on K_DIAG.
+#   STAGES=cohorts        40 jobs   the 2x2x2 block x z x iter factorial on
+#                                   K_DIAG. Genuinely a grid -- kept last
+#                                   because it is the only stage whose
+#                                   questions need joint variation.
+#   STAGES=tfb            45 jobs   transformer baseline, 3 seeds on K_DIAG.
+#
+# Legacy tokens still work: "fig1" == "cohorts" over the full K_LIST, and
+# "ablation" expands to all three ablation stages, so any existing caller
+# keeps its old meaning.
+STAGES="${STAGES:-baseline}"
+[[ " $STAGES " == *" ablation "* ]] && STAGES="$STAGES ablation_act ablation_arch tfb"
 
 main() {
     local tier k spec tag arch arch_args mlp_t Hc Lc s lay cyc r
@@ -241,15 +521,72 @@ main() {
         done
         return 0
     fi
-    # -- 1) fig1 grid (highest priority: lowest sequence numbers) --
-    #    Tier-major, then k-major: all tf cells first (see COHORT_TIERS).
-    if [[ " $STAGES " == *" fig1 "* ]]; then
+    # -- 1a) STAGE 1: baseline k-sweep. ONE cohort, every k, one seed. --
+    # This is the map the rest of the campaign is read against: it locates the
+    # k at which the baseline stops learning. Nothing else should be enqueued
+    # until this is read, because every later stage picks its K_DIAG from it.
+    if [[ " $STAGES " == *" baseline "* ]]; then
+        RUN_GROUP="${RUN_GROUP_BASELINE:-baseline}"
+        for k in "${K_LIST[@]}"; do
+            for spec in "${COHORTS[@]}"; do
+                IFS='|' read -r tag arch mlp_t Hc Lc <<< "$spec"
+                [[ "$tag" == "$BASELINE_COHORT" ]] || continue
+                local blk zf itf
+                blk="${tag%%_*}"
+                case "$tag" in *_noz_*) zf=0;; *) zf=1;; esac
+                case "$tag" in *_noiter) itf=0;; *) itf=1;; esac
+                for s in "${SEEDS[@]}"; do
+                    CELL_ID="arm=baseline,block=${blk},z=${zf},it=${itf},n=10,k=${k},s=${s}"
+                    emit_job "${prefix}base_${tag}_k${k}_s${s}" "$arch" "$k" "$s" \
+                        "arch.mlp_t=${mlp_t} arch.H_cycles=${Hc} arch.L_cycles=${Lc}" \
+                        "arch.L_layers=2 arch.halt_max_steps=1"
+                done
+            done
+        done
+    fi
+    # -- 1b) STAGE 2: seed variance on the baseline, at K_DIAG only. --
+    # Gate for everything after it. If identical configs disperse widely, no
+    # single-seed ablation cell below can be read as a real effect.
+    if [[ " $STAGES " == *" seedvar "* ]]; then
+        RUN_GROUP="${RUN_GROUP_SEEDVAR:-seedvar}"
+        for k in "${K_DIAG[@]}"; do
+            for spec in "${COHORTS[@]}"; do
+                IFS='|' read -r tag arch mlp_t Hc Lc <<< "$spec"
+                [[ "$tag" == "$BASELINE_COHORT" ]] || continue
+                local blk zf itf
+                blk="${tag%%_*}"
+                case "$tag" in *_noz_*) zf=0;; *) zf=1;; esac
+                case "$tag" in *_noiter) itf=0;; *) itf=1;; esac
+                for s in ${SEEDVAR_SEEDS:-2 3}; do
+                    CELL_ID="arm=seedvar,block=${blk},z=${zf},it=${itf},n=10,k=${k},s=${s}"
+                    emit_job "${prefix}base_${tag}_k${k}_s${s}" "$arch" "$k" "$s" \
+                        "arch.mlp_t=${mlp_t} arch.H_cycles=${Hc} arch.L_cycles=${Lc}" \
+                        "arch.L_layers=2 arch.halt_max_steps=1"
+                done
+            done
+        done
+    fi
+    # -- 1c) cohort factorial (legacy name: fig1). Genuinely a grid, so it --
+    #    runs LAST and only over K_DIAG unless the legacy "fig1" token is used.
+    if [[ " $STAGES " == *" cohorts "* || " $STAGES " == *" fig1 "* ]]; then
+        RUN_GROUP="${RUN_GROUP_FIG1:-fig1}"
+        local -a COHORT_KS
+        if [[ " $STAGES " == *" fig1 "* ]]; then COHORT_KS=("${K_LIST[@]}"); else COHORT_KS=("${K_DIAG[@]}"); fi
         for tier in "${COHORT_TIERS[@]}"; do
-            for k in "${K_LIST[@]}"; do
+            for k in "${COHORT_KS[@]}"; do
                 for spec in "${COHORTS[@]}"; do
                     IFS='|' read -r tag arch mlp_t Hc Lc <<< "$spec"
                     [[ "$tag" == "${tier}_"* ]] || continue
+                    # tag is "<block>_<z>_<iter>", e.g. tf_z_iter / mlp_noz_noiter.
+                    # Decode it into the axes the old cell_id convention named,
+                    # rather than shipping the tag string and making every
+                    # consumer re-learn the grammar.
+                    local blk zf itf
+                    blk="${tag%%_*}"                       # mlp | tf
+                    case "$tag" in *_noz_*) zf=0;; *) zf=1;; esac
+                    case "$tag" in *_noiter) itf=0;; *) itf=1;; esac
                     for s in "${SEEDS[@]}"; do
+                        CELL_ID="arm=fig1,block=${blk},z=${zf},it=${itf},n=10,k=${k},s=${s}"
                         emit_job "${prefix}fig1_${tag}_k${k}_s${s}" "$arch" "$k" "$s" \
                             "arch.mlp_t=${mlp_t} arch.H_cycles=${Hc} arch.L_cycles=${Lc}" \
                             "arch.L_layers=2 arch.halt_max_steps=1"
@@ -258,24 +595,75 @@ main() {
             done
         done
     fi
-    # -- 2) module ablations (appended: run only after fig1 drains, if same host) --
-    if [[ " $STAGES " == *" ablation "* ]]; then
-        for k in "${K_LIST[@]}"; do
-            for spec in "${TRM_ABLATIONS[@]}"; do
+    # -- 2a) ACT / halting ablation --
+    # NOTE the ${arch_args} suffix: it comes AFTER the pinned
+    # `arch.halt_max_steps=1` baseline, so a later duplicate key wins under
+    # Hydra. That ordering is what makes halt2/4/8/16 actually take effect.
+    #
+    # z_seq_metrics is set HERE, in the stage body, rather than in common_args
+    # or at the call site, because it is a property of the stage and not of the
+    # invocation: the depth instrumentation (zseq/ zmi/ ztau/ zperm/) reduces
+    # over the per-ACT-step trajectory, and ablation_act is the only stage that
+    # produces one.  Every other stage pins arch.halt_max_steps=1, i.e. exactly
+    # one ACT step, where those keys would be emitted as flat single-point
+    # series -- readable as "the metric is constant" when the truth is "there
+    # was nothing to vary".  Setting it stage-locally makes that impossible to
+    # get wrong by forgetting an env var.  ACT_SEQ_METRICS=False turns it off
+    # without touching this file.
+    if [[ " $STAGES " == *" ablation_act "* ]]; then
+        RUN_GROUP="${RUN_GROUP_ACT:-ablation_act}"
+        for k in "${K_DIAG[@]}"; do
+            for spec in "${ACT_ABLATIONS[@]}"; do
                 IFS='|' read -r tag arch_args <<< "$spec"
                 for s in "${SEEDS[@]}"; do
+                    CELL_ID="arm=act,halt=${tag#halt},n=10,k=${k},s=${s}"
+                    emit_job "${prefix}abl_${tag}_k${k}_s${s}" "trm" "$k" "$s" \
+                        "arch.mlp_t=False arch.H_cycles=3 arch.L_cycles=6" \
+                        "arch.L_layers=2 arch.halt_max_steps=1 ${arch_args}" \
+                        "+z_seq_metrics=${ACT_SEQ_METRICS:-True}"
+                done
+            done
+        done
+    fi
+    # -- 2b) model-structure ablation --
+    if [[ " $STAGES " == *" ablation_arch "* ]]; then
+        RUN_GROUP="${RUN_GROUP_ARCH:-ablation_arch}"
+        for k in "${K_DIAG[@]}"; do
+            for spec in "${ARCH_ABLATIONS[@]}"; do
+                IFS='|' read -r tag arch_args <<< "$spec"
+                for s in "${SEEDS[@]}"; do
+                    # Decode the tag into semantic keys rather than shipping
+                    # the tag string -- otherwise a consumer still has to know
+                    # the tag grammar, which is exactly what cell_id exists to
+                    # avoid (the other three arms already decode).
+                    local akey aval
+                    case "$tag" in
+                        H*)   akey=Hc;     aval="${tag#H}"   ;;
+                        L*[0-9]) akey=Lc;  aval="${tag#L}"   ;;
+                        lay*) akey=layers; aval="${tag#lay}" ;;
+                        *)    akey=axis;   aval="$tag"       ;;
+                    esac
+                    CELL_ID="arm=arch,${akey}=${aval},n=10,k=${k},s=${s}"
                     emit_job "${prefix}abl_${tag}_k${k}_s${s}" "trm" "$k" "$s" \
                         "arch.mlp_t=False arch.H_cycles=3 arch.L_cycles=6" \
                         "arch.L_layers=2 arch.halt_max_steps=1 ${arch_args}"
                 done
             done
+        done
+    fi
+    # -- 2c) transformer-baseline depth/width grid --
+    if [[ " $STAGES " == *" tfb "* ]]; then
+        RUN_GROUP="${RUN_GROUP_TFB:-tfb}"
+        for k in "${K_DIAG[@]}"; do
             for lay in "${TFB_LAYERS[@]}"; do
-                for cyc in "${TFB_CYCLES[@]}"; do
-                    for s in "${SEEDS[@]}"; do
-                        emit_job "${prefix}abl_tfb_lay${lay}_cyc${cyc}_k${k}_s${s}" \
-                            "transformers_baseline" "$k" "$s" \
-                            "arch.H_layers=${lay} arch.H_cycles=${cyc} arch.halt_max_steps=1"
-                    done
+                for s in "${TFB_SEEDS[@]}"; do
+                    # arch.H_cycles deliberately NOT passed -- it is a no-op for
+                    # this arch (see TFB_SEEDS note above). Passing it would only
+                    # write a misleading value into the wandb config.
+                    CELL_ID="arm=tfb,lay=${lay},n=10,k=${k},s=${s}"
+                    emit_job "${prefix}abl_tfb_lay${lay}_k${k}_s${s}" \
+                        "transformers_baseline" "$k" "$s" \
+                        "arch.H_layers=${lay} arch.halt_max_steps=1"
                 done
             done
         done

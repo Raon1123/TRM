@@ -20,7 +20,8 @@
 # use casually: GPUs 0-3 belong to other users' jobs).
 #
 # Job file = plain bash script. The runner executes it with
-# CUDA_VISIBLE_DEVICES pinned to the worker's GPU and logs to logs/queue/.
+# CUDA_VISIBLE_DEVICES pinned to the worker's GPU, pinned to a NUMA-local CPU
+# slice (see CPU affinity below), and logs to logs/queue/.
 
 set -u -o pipefail
 
@@ -40,6 +41,50 @@ if [[ "${FORCE_GPUS:-0}" != "1" ]]; then
         esac
     done
 fi
+
+# ---------------------------------------------------------------------------
+# CPU affinity.  Measured on this box with `nvidia-smi topo -m` (2026-08-06):
+#
+#     GPU 0-3  ->  NUMA node0  ->  cores   0-63    (other users' jobs)
+#     GPU 4-7  ->  NUMA node1  ->  cores  64-127   (this queue)
+#
+# Every GPU4-7 / GPU0-3 pair reports `SYS` — "traversing PCIe as well as the
+# SMP interconnect between NUMA nodes" — which is the slowest class the topo
+# matrix has.  There are two independent reasons to pin, and each would justify
+# this on its own:
+#
+#   1. Cross-node host memory.  An unpinned worker can be scheduled onto node0
+#      while its GPU hangs off node1, so every host->device staging buffer
+#      crosses the UPI link.
+#   2. Thread oversubscription.  Torch sizes its intra-op pool from nproc,
+#      which is 128 here, so four unpinned workers ask for ~512 threads.  Those
+#      threads are free to land on cores 0-63, i.e. this queue would be
+#      competing with the other users' jobs rather than staying in its lane.
+#
+# Each GPU gets a DISJOINT 16-core slice of node1, so workers do not fight one
+# another either.  With the default GPUS the four slices exactly tile 64-127.
+#
+#     CPU_AFFINITY=0   restore the previous free-floating behaviour
+#     CORES_PER_WORKER=N   widen/narrow each slice (default 16)
+#
+# Pinning is skipped silently for any GPU outside 4-7 (only reachable via
+# FORCE_GPUS=1, where node1 is the wrong node anyway) and if taskset is absent.
+# ---------------------------------------------------------------------------
+CPU_AFFINITY="${CPU_AFFINITY:-1}"
+NODE1_CORE_BASE="${NODE1_CORE_BASE:-64}"
+CORES_PER_WORKER="${CORES_PER_WORKER:-16}"
+
+cpu_slice_for_gpu() {
+    # GPU 4 -> 64-79, 5 -> 80-95, 6 -> 96-111, 7 -> 112-127.
+    local gpu="$1" idx lo hi
+    [[ "$CPU_AFFINITY" == "1" ]] || { echo ""; return; }
+    command -v taskset >/dev/null 2>&1 || { echo ""; return; }
+    idx=$(( gpu - 4 ))
+    (( idx < 0 || idx > 3 )) && { echo ""; return; }
+    lo=$(( NODE1_CORE_BASE + idx * CORES_PER_WORKER ))
+    hi=$(( lo + CORES_PER_WORKER - 1 ))
+    echo "${lo}-${hi}"
+}
 
 JOBS_DIR="$QUEUE_DIR/jobs"
 PROC_DIR="$QUEUE_DIR/processing"
@@ -68,6 +113,10 @@ if [[ "${1:-}" == "dry-run" ]]; then
     n_workers=$(wc -w <<< "$GPUS")
     echo "== dry run: nothing will be executed =="
     echo "workers: $n_workers (GPUs: $GPUS)   poll: ${POLL_S}s"
+    for g in $GPUS; do
+        slice="$(cpu_slice_for_gpu "$g")"
+        printf '  gpu%s -> cpus %s\n' "$g" "${slice:-unpinned}"
+    done
     n_stale=$(ls -1 "$PROC_DIR"/*.job.gpu* 2>/dev/null | wc -l)
     (( n_stale > 0 )) && echo "startup would recover $n_stale stale processing/ job(s) into jobs/"
     [[ -e "$STOP_FILE" ]] && echo "startup would remove leftover stop file"
@@ -122,8 +171,24 @@ worker_loop() {
         mv "$job" "$claimed" 2>/dev/null || continue
 
         local log_file="$LOG_DIR/${name%.job}.log"
-        log "gpu$gpu: start $name (log: $log_file)"
-        if CUDA_VISIBLE_DEVICES="$gpu" bash "$claimed" >> "$log_file" 2>&1; then
+
+        # Build the launch as explicit arrays: `${var:+FOO=bar}` in command
+        # position is NOT recognised as an env assignment by bash (assignment
+        # prefixes must be literal words), so it would be passed to the job as
+        # a positional argument instead of being exported. `env` avoids that.
+        local cpuset
+        cpuset="$(cpu_slice_for_gpu "$gpu")"
+        local -a envs=(CUDA_VISIBLE_DEVICES="$gpu")
+        local -a runner=(bash "$claimed")
+        if [[ -n "$cpuset" ]]; then
+            # Match the thread pools to the slice; otherwise torch still sizes
+            # them from nproc=128 and oversubscribes the 16 cores it can use.
+            envs+=(OMP_NUM_THREADS="$CORES_PER_WORKER" MKL_NUM_THREADS="$CORES_PER_WORKER")
+            runner=(taskset --cpu-list "$cpuset" "${runner[@]}")
+        fi
+
+        log "gpu$gpu: start $name (cpus: ${cpuset:-unpinned}, log: $log_file)"
+        if env "${envs[@]}" "${runner[@]}" >> "$log_file" 2>&1; then
             mv "$claimed" "$DONE_DIR/$name"
             log "gpu$gpu: done  $name"
         else

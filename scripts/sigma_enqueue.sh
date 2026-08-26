@@ -145,6 +145,18 @@ SEEDS=(${SEEDS:-1})
 # reliably learnable, 5/6/7 is where collapse and non-monotonicity appear, 10
 # is the far end. Override once stage 1 has told you where the real boundary
 # is on THIS data generation -- that is the entire point of staging.
+# WARNING (SP-04-L03 / G-20260813-inverse-learnability, 2026-08-13): do NOT
+# extend K_DIAG to include 12 or 16 as a shortcut for covering the SP-04
+# judgment cells. K_DIAG feeds the LIVE ablation_act / ablation_arch / tfb
+# stages, which run under D1 semantics (epochs=50000, see the "2026-08-06:
+# epochs 100000 -> 50000" comment above) -- but the SP-04 judgment protocol
+# for k=12/16 is D0 + epochs=100000, a DIFFERENT budget on the SAME
+# architecture cohort (tf_noz_iter). Folding 12/16 into K_DIAG would silently
+# launch a wrong-protocol live run at those k values before the dedicated
+# `invcells` stage (below) ever fires, producing two non-comparable results
+# at the same k with no run_name collision to catch the mismatch
+# (abl_*_k12_s1 vs pp_inv_tf_noz_iter_k12_s1 are different names, so
+# enqueue()'s idempotency skip will NOT protect against this).
 K_DIAG=(${K_DIAG:-3 5 6 7 10})
 
 # The single reference cell every ablation perturbs by exactly one factor.
@@ -274,18 +286,84 @@ ACT_ABLATIONS=(
 # H_cycles = outer recurrence, L_cycles = inner, L_layers = block depth.
 # L3 is retained because it is the one cell with a KNOWN non-monotone failure
 # (k=5,6 collapsed while k=3,4,7,8,10 reached 1.0) -- see design doc §4.1.
+#
+# THE ONE THING TO KNOW BEFORE READING THIS AXIS (trm.py:207-216): the first
+# H_cycles-1 outer cycles run under `torch.no_grad()`; only the last one is in
+# the gradient path.  So define, per ACT step,
+#
+#     blocks applied  C = H_cycles * (L_cycles + 1) * L_layers
+#     blocks w/ grad  G =            (L_cycles + 1) * L_layers
+#
+# and H_cycles moves C but NOT G.  Measured on this repo (n=10, k=5 metadata,
+# CPU instantiation, 2026-08-06):
+#
+#     variant     params        C     G
+#     lay1         3,420,162    21     7
+#     baseline     6,828,034    42    14      H3 L6 lay2
+#     L12          6,828,034    78    26
+#     lay4        13,643,778    84    28
+#     L24          6,828,034   150    50      <- added
+#     lay8        27,275,266   168    56      <- added
+#     H1 / H6      6,828,034  14/84   14      G identical to baseline
+#
+# That yields three distinct, individually well-posed questions instead of one
+# muddled "depth" question:
+#
+#   (a) H1 / baseline / H6 hold G = 14 fixed and vary C by 6x.  This is NOT a
+#       depth ladder -- it asks whether extra no-grad forward refinement helps
+#       at all.  Well-posed as-is; do not read it as "more loops = deeper".
+#   (b) The G-matched ladder pairs a params-FIXED recurrence arm against a
+#       params-DOUBLING layer arm at each rung:
+#           G ~  7-8 : L3   (6.83M) vs lay1 ( 3.42M)
+#           G =   14 : baseline, the shared origin of both arms
+#           G ~ 26-28: L12  (6.83M) vs lay4 (13.64M)
+#           G ~ 50-56: L24  (6.83M) vs lay8 (27.28M)   <- the two new cells
+#       L24/lay8 exist because the ladder previously stopped at rung 3, where
+#       the params gap is only 2x; at rung 4 it is 4x, which is where a
+#       weight-tying claim either survives or does not.
+#   (c) tfb (below) supplies the no-recurrence arm.
+#
+# COST is NOT uniform across this list: runtime tracks C, so L24 (~3.6x
+# baseline) and lay8 (~4x) are the two expensive cells.  lay8 is also the
+# largest activation footprint in the campaign (G = 56 blocks kept for
+# backward at global_batch_size=2048); if anything OOMs it is this cell, and
+# it will land in scripts/queue/failed/ rather than corrupting its neighbours.
 ARCH_ABLATIONS=(
     "H6|arch.H_cycles=6"
     "H1|arch.H_cycles=1"
     "L3|arch.L_cycles=3"
     "L12|arch.L_cycles=12"
+    "L24|arch.L_cycles=24"
     "lay1|arch.L_layers=1"
     "lay4|arch.L_layers=4"
+    "lay8|arch.L_layers=8"
 )
 # transformers_baseline depth/width ablation (old TRANSFORMER_SWEEP grid).
 # arch.halt_max_steps=1 pinned — tfb yaml defaults to 16, which the old sweep
 # left in place (protocol mismatch vs fig1); here every run is halt=1.
-TFB_LAYERS=(${TFB_LAYERS:-1 2 6})
+#
+# tfb has no inner cycles at all (transformers_baseline.py:7 "REMOVED inner
+# cycles"), so for it C = G = H_layers -- a plain stack.  Two of these layer
+# counts are chosen against the trm numbers tabulated above, not by round
+# numbers:
+#
+#   lay2  (6,795,266 params) is PARAMETER-MATCHED to the trm baseline
+#         (6,828,034, a 0.5% gap).  Same weights budget; the baseline applies
+#         them 42 times, tfb twice.  This is the cleanest read on recurrence.
+#   lay14 (47,493,122 params) is GRADIENT-DEPTH-MATCHED to the trm baseline
+#         (G = 14 both).  Added 2026-08-06.  Without it the campaign can say
+#         "recurrence beats a same-size stack" but cannot say anything about
+#         a stack that is genuinely as deep, because tfb topped out at 6 --
+#         and the answer costs 7x the parameters, which is the actual claim.
+#
+# Deliberately NOT included: lay26 (88,190,978 params) would match L12's
+# G = 26, but an 88M-parameter model on 5,000 training examples is a
+# different regime (capacity-saturated), so the comparison would confound
+# depth with overfitting.  Matching trm baseline's C = 42 is worse still:
+# ~42 distinct layers, ~140M params.  The compute-matched pure-transformer
+# comparison is therefore OUT OF SCOPE by construction, not an oversight --
+# say so when reporting rather than implying the sweep covers it.
+TFB_LAYERS=(${TFB_LAYERS:-1 2 6 14})
 
 # 2026-08-06 — TFB_CYCLES REMOVED. `arch.H_cycles` is a NO-OP for
 # arch=transformers_baseline: in models/recursive_reasoning/transformers_baseline.py
@@ -312,6 +390,68 @@ TFB_LAYERS=(${TFB_LAYERS:-1 2 6})
 # seeds are required, and if it is not, the repeats explain what actually
 # differed.
 TFB_SEEDS=(${TFB_SEEDS:-1 2 3})
+
+# ---- SP-04-L03 judgment cells (G-20260813-inverse-learnability) ----------
+# tf_noz_iter (the H-collapse cohort) at k in {9,12,13,16}: does it learn AT
+# ALL under D0 data given a longer budget than the live campaign default?
+# User-confirmed design 2026-08-13. See the invcells stage body in main() for
+# why epochs=100000 (not the live default 50000) and why RUN_GROUP is a
+# dedicated "inverse-cells-d0".
+#
+# INV_SEEDS is intentionally its own array -- never SEEDS / ABLATION_SEEDS /
+# TFB_SEEDS. A previous campaign (EXP-013) shared a seed array across two
+# runs that were meant to be independent, which silently coupled their seed
+# semantics; giving every campaign its own private seed array is how that
+# does not repeat here.
+#
+# INV_K_LIST is ordered with 16 first, not for grid semantics (order does not
+# change WHICH 12 cells are emitted) but because the intended real-launch
+# tripwire is k=16 s=1 fired alone first: k=16 has the narrowest achievable
+# ord(sigma) pool in the whole campaign (K_LIST comment above: ord>16 ->
+# only {20,21,30}), so it is the most likely of the four k values to expose a
+# data or config problem early, before the other 11 cells are released. This
+# file does not enforce the tripwire (this task is dry-run-definition only,
+# no enqueue) -- it is an operator obligation at real-launch time, recorded
+# here so the ordering intent is not lost.
+INV_K_LIST=(${INV_K_LIST:-16 12 13 9})
+INV_SEEDS=(${INV_SEEDS:-1 2 3})
+
+# INV_CELLS_FILTER (real-launch tripwire, added 2026-08-13): optional
+# "k:seed[,k:seed,...]" allowlist restricting invcells emission to exactly
+# the listed cells. UNSET (default) is IDENTICAL to the prior behaviour --
+# every (k,s) in INV_K_LIST x INV_SEEDS is emitted, all 12. Exists because
+# under FIFO + 4-worker parallelism, "enqueue all 12 invcells jobs" makes any
+# single-cell tripwire (fire k=16 s=1 alone, confirm it lands in
+# scripts/queue/done/, THEN release the other 11) purely aspirational unless
+# the enqueuer itself can be told to emit fewer than all 12.
+#   INV_CELLS_FILTER="16:1" scripts/sigma_enqueue.sh   # tripwire cell only
+INV_CELLS_FILTER="${INV_CELLS_FILTER:-}"
+
+# inv_cell_allowed <k> <seed> -- true iff INV_CELLS_FILTER is unset, or "k:s"
+# is one of its comma-separated entries. See INV_CELLS_FILTER above.
+inv_cell_allowed() {
+    local k="$1" s="$2" pair
+    [[ -z "$INV_CELLS_FILTER" ]] && return 0
+    local -a _pairs
+    IFS=',' read -r -a _pairs <<< "$INV_CELLS_FILTER"
+    for pair in "${_pairs[@]}"; do
+        [[ "$(trim "$pair")" == "${k}:${s}" ]] && return 0
+    done
+    return 1
+}
+
+# ---- Seed-extension grid (SP-04-L04 / GATE-EXP013-LAUNCH narrowed alt) ----
+# tf_noz_iter, D0, at the 7 k values where seed=1 already fit
+# (k=3,4,5,6,7,8,10 -- these are the baseline/fig1 k's known to reach the
+# collapse-diagnostic band, NOT the invcells k's above): seeds 2,3 only.
+# seed=1 is deliberately excluded from the array (not left in and relied on
+# to be idempotency-skipped) -- SEEDEXT_SEEDS={2,3} IS the grid definition,
+# per the same EXP-013 lesson as INV_SEEDS: a seed array is campaign
+# semantics, not a superset to be filtered down at enqueue time.
+# User-approved 2026-08-13. See the seedext stage body in main() for why
+# epochs=100000 and RUN_GROUP="seedext-d0".
+SEEDEXT_K_LIST=(${SEEDEXT_K_LIST:-3 4 5 6 7 8 10})
+SEEDEXT_SEEDS=(${SEEDEXT_SEEDS:-2 3})
 
 # CELL_ID is set by each stage before calling emit_job (see the stages below)
 # and is emitted into the run config verbatim. It is the machine-readable grid
@@ -496,6 +636,24 @@ EOF
 #                                   because it is the only stage whose
 #                                   questions need joint variation.
 #   STAGES=tfb            45 jobs   transformer baseline, 3 seeds on K_DIAG.
+#   STAGES=invcells       12 jobs   SP-04-L03 judgment cells
+#                                   (G-20260813-inverse-learnability):
+#                                   tf_noz_iter at k in {9,12,13,16}, D0 data,
+#                                   epochs=100000 (NOT the live default
+#                                   50000), 3 seeds from the PRIVATE INV_SEEDS
+#                                   array. run_group "inverse-cells-d0". Not
+#                                   folded into any legacy token expansion --
+#                                   must be selected explicitly.
+#   STAGES=seedext        14 jobs   SP-04-L04 seed-extension grid
+#                                   (GATE-EXP013-LAUNCH narrowed alt): same
+#                                   tf_noz_iter / D0 / epochs=100000 protocol
+#                                   as invcells, but at the 7 ALREADY-FITTING
+#                                   baseline k's (3,4,5,6,7,8,10), seeds 2,3
+#                                   only (seed=1 already done/, excluded from
+#                                   the array by design, not filtered at
+#                                   enqueue time). PRIVATE SEEDEXT_SEEDS array.
+#                                   run_group "seedext-d0". Also must be
+#                                   selected explicitly.
 #
 # Legacy tokens still work: "fig1" == "cohorts" over the full K_LIST, and
 # "ablation" expands to all three ablation stages, so any existing caller
@@ -664,6 +822,85 @@ main() {
                     emit_job "${prefix}abl_tfb_lay${lay}_k${k}_s${s}" \
                         "transformers_baseline" "$k" "$s" \
                         "arch.H_layers=${lay} arch.halt_max_steps=1"
+                done
+            done
+        done
+    fi
+    # -- 2d) SP-04-L03 judgment cells (G-20260813-inverse-learnability) -----
+    # tf_noz_iter (the H-collapse cohort) at k in {9,12,13,16}, D0 data
+    # (DATA_ROOT is already data/sigma_k_10, the n=10 canonical corpus), with
+    # a LONGER budget than the live campaign default: epochs=100000 (244,140
+    # steps) instead of the live default epochs=50000 baked into common_args
+    # (see the "2026-08-06: epochs 100000 -> 50000" comment above for why the
+    # live default sits where it does -- this stage is a deliberate,
+    # user-confirmed exception to it, not a reversion of that decision).
+    # `epochs=100000` is passed as an emit_job extra arg, which lands AFTER
+    # common_args in the job body, so it overrides common_args' epochs=50000
+    # under Hydra's last-key-wins rule (the same ordering pattern documented
+    # at the ablation_act arch_args note above). eval_save_outputs is already
+    # inherited unmodified from common_args -- verified 2026-08-13 that it
+    # only filters which already-computed tensors evaluate() detaches for
+    # saving (pretrain.py:511,553; models/losses.py:100), entirely inside
+    # torch.inference_mode() at a call site (pretrain.py:867) separate from
+    # train_batch(), so it cannot affect the optimization trajectory.
+    #
+    # RUN_GROUP is a dedicated "inverse-cells-d0" (distinct from baseline/
+    # ablation_*/tfb/fig1), and the seed array is the PRIVATE INV_SEEDS
+    # defined above, never SEEDS/ABLATION_SEEDS/TFB_SEEDS (EXP-013 lesson).
+    #
+    # TRIPWIRE: fire k=16 s=1 alone first (INV_CELLS_FILTER="16:1") and
+    # confirm it reaches scripts/queue/done/ before releasing the other 11
+    # cells (unset INV_CELLS_FILTER); see the INV_K_LIST comment above for
+    # why 16 is ordered first, and the INV_CELLS_FILTER comment above for why
+    # the filter itself is needed under FIFO + 4-worker parallelism.
+    if [[ " $STAGES " == *" invcells "* ]]; then
+        RUN_GROUP="${RUN_GROUP_INV:-inverse-cells-d0}"
+        for k in "${INV_K_LIST[@]}"; do
+            for spec in "${COHORTS[@]}"; do
+                IFS='|' read -r tag arch mlp_t Hc Lc <<< "$spec"
+                [[ "$tag" == "tf_noz_iter" ]] || continue
+                for s in "${INV_SEEDS[@]}"; do
+                    inv_cell_allowed "$k" "$s" || continue
+                    CELL_ID="arm=invcells,block=tf,z=0,it=1,n=10,k=${k},s=${s}"
+                    emit_job "${prefix}pp_inv_tf_noz_iter_k${k}_s${s}" "$arch" "$k" "$s" \
+                        "arch.mlp_t=${mlp_t} arch.H_cycles=${Hc} arch.L_cycles=${Lc}" \
+                        "arch.L_layers=2 arch.halt_max_steps=1" \
+                        "epochs=100000"
+                done
+            done
+        done
+    fi
+    # -- 2e) SP-04-L04 seed-extension grid (GATE-EXP013-LAUNCH narrowed alt) -
+    # Same tf_noz_iter / D0 / epochs=100000 protocol as invcells (2d, above),
+    # but at the 7 k values where seed=1 ALREADY FITS (the baseline/fig1 k's
+    # 3,4,5,6,7,8,10 -- distinct from invcells' k in {9,12,13,16}), seeds 2,3
+    # only. seed=1 is not in SEEDEXT_SEEDS at all (excluded by the array
+    # itself, not filtered post hoc): the array IS the grid definition, per
+    # the same EXP-013 lesson INV_SEEDS above already documents -- a shared
+    # or over-broad seed array silently redefines what a downstream reader
+    # thinks the campaign covers.
+    #
+    # run_name is DELIBERATELY `pp_seedext_...`, not the `fig1_...` legacy
+    # pattern the k-sweep stages above use: fig1_* run_names read as
+    # continuations of the SEALED Sigma_k_new generation (see the
+    # "2026-08-06: default project moved" comment above WANDB_PROJECT), and
+    # this grid is neither that generation nor its protocol (D0 +
+    # epochs=100000 vs D1 + epochs=50000).
+    #
+    # RUN_GROUP is a dedicated "seedext-d0" (distinct from inverse-cells-d0
+    # and every other group above).
+    if [[ " $STAGES " == *" seedext "* ]]; then
+        RUN_GROUP="${RUN_GROUP_SEEDEXT:-seedext-d0}"
+        for k in "${SEEDEXT_K_LIST[@]}"; do
+            for spec in "${COHORTS[@]}"; do
+                IFS='|' read -r tag arch mlp_t Hc Lc <<< "$spec"
+                [[ "$tag" == "tf_noz_iter" ]] || continue
+                for s in "${SEEDEXT_SEEDS[@]}"; do
+                    CELL_ID="arm=seedext,block=tf,z=0,it=1,n=10,k=${k},s=${s}"
+                    emit_job "${prefix}pp_seedext_tf_noz_iter_k${k}_s${s}" "$arch" "$k" "$s" \
+                        "arch.mlp_t=${mlp_t} arch.H_cycles=${Hc} arch.L_cycles=${Lc}" \
+                        "arch.L_layers=2 arch.halt_max_steps=1" \
+                        "epochs=100000"
                 done
             done
         done

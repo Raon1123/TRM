@@ -260,6 +260,38 @@ COHORTS=(
 # complete z × iter 2×2 before moving deeper.
 COHORT_TIERS=(tf mlp)
 
+# COHORT_FILTER (2026-08-26, pp-campaign closeout supplement P1.2/design doc
+# `lab/23_reports/11_lab-reports/2026-08-26_pp-campaign-closeout-supplement-design.md`):
+# optional comma-separated allowlist of full COHORTS tags (e.g. "tf_noz_iter"),
+# restricting the cohorts/fig1 stage (1c, below) to exactly those cohorts.
+# UNSET (default) is IDENTICAL to prior behaviour -- every cohort in the
+# matching COHORT_TIERS tier is emitted, same as before this existed.
+#
+# Exists because COHORT_TIERS only filters by tier PREFIX (tf/mlp), not by the
+# full z/iter tag, so there was no way to enqueue e.g. a single-cohort seed
+# top-up (tf_noz_iter k10 s2/s3, to actually firm up the n=1 recursion-
+# attribution reading in the closeout design doc's P1.2 -- the already-built
+# `seedext` stage looks like it would do this but runs D0/epochs=100000, a
+# different protocol from the D1/122k fig1 cell the claim depends on) without
+# emitting the other 6-7 unwanted cohorts at that k too. Same allowlist
+# pattern as INV_CELLS_FILTER above (cohort_allowed mirrors inv_cell_allowed).
+#   COHORT_FILTER="tf_noz_iter" STAGES=fig1 K_LIST="10" SEEDS="2 3" \
+#       DATA_ROOT=data/power_permutation/d1 scripts/sigma_enqueue.sh pp
+COHORT_FILTER="${COHORT_FILTER:-}"
+
+# cohort_allowed <tag> -- true iff COHORT_FILTER is unset, or <tag> is one of
+# its comma-separated entries. See COHORT_FILTER above.
+cohort_allowed() {
+    local tag="$1" c
+    [[ -z "$COHORT_FILTER" ]] && return 0
+    local -a _tags
+    IFS=',' read -r -a _tags <<< "$COHORT_FILTER"
+    for c in "${_tags[@]}"; do
+        [[ "$(trim "$c")" == "$tag" ]] && return 0
+    done
+    return 1
+}
+
 # ---- Module ablations (FIFO priority AFTER the fig1 grid) -----------------
 # One-factor-at-a-time around the canonical TRM baseline fig1_tf_z_iter
 # (arch=trm, mlp_t=False, H3, L6, L_layers=2, halt=1); axis values taken from
@@ -735,6 +767,7 @@ main() {
                 for spec in "${COHORTS[@]}"; do
                     IFS='|' read -r tag arch mlp_t Hc Lc <<< "$spec"
                     [[ "$tag" == "${tier}_"* ]] || continue
+                    cohort_allowed "$tag" || continue
                     # tag is "<block>_<z>_<iter>", e.g. tf_z_iter / mlp_noz_noiter.
                     # Decode it into the axes the old cell_id convention named,
                     # rather than shipping the tag string and making every

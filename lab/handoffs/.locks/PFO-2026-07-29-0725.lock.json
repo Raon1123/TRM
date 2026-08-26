@@ -1,8 +1,0 @@
-{
-  "code": "PFO",
-  "handoff_file": "lab/handoffs/2026-07-29_perf-flamechart-p1a-refuted.md",
-  "track": "perf-optimization / PERF-001",
-  "created_at": "2026-07-29T07:25",
-  "status": "ready-for-resume",
-  "next_action": "Read lab/reports/2026-07-29_perf002-p1a-refuted.md §5 → metrics 로깅 주기 후보를 사전등록(관측가능성 변경)한 뒤 A/B 측정"
-}

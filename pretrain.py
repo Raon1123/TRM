@@ -72,6 +72,24 @@ class PretrainConfig(pydantic.BaseModel):
     # Names
     project_name: Optional[str] = None
     run_name: Optional[str] = None
+    # wandb GROUP — the only real "sub-project" mechanism wandb has (project is
+    # flat). Lets one project (e.g. power_permutation) hold several campaign
+    # arms (fig1 / ablation_act / ablation_arch / tfb) as filterable groups
+    # instead of forcing a separate project per arm. None => ungrouped, which
+    # is exactly the pre-2026-08-06 behaviour, so every existing launch line
+    # keeps working unchanged.
+    run_group: Optional[str] = None
+    # Machine-readable grid coordinate, e.g.
+    #   "arm=fig1,block=tf,z=1,it=1,n=10,k=9,s=1"
+    #   "arm=act,halt=8,n=10,k=9,s=1"
+    # Flat, comma-separated, sorted-by-convention key=value pairs. Written
+    # into the wandb config (wandb.init logs config.model_dump()), so
+    # downstream reanalysis reads the cell coordinate DIRECTLY instead of
+    # re-deriving it by parsing run_name -- the same "never infer identity
+    # from a name string" rule the provenance layer already enforces for
+    # data_epoch. run_name stays human-facing and may be renamed freely
+    # without breaking any consumer. None => not a grid run.
+    cell_id: Optional[str] = None
     load_checkpoint: Optional[str] = None
     checkpoint_path: Optional[str] = None
 
@@ -95,6 +113,15 @@ class PretrainConfig(pydantic.BaseModel):
     z_snapshot: bool = True
     phase_threshold: float = 0.999
     phase_patience: int = 2
+    # Second gate on top of log_z_dynamics for the additive sequence/trajectory
+    # metrics (zseq/, zmi/, ztau/, zperm/ — see utils/z_logging.py).  Off by
+    # default so in-flight jobs and baseline re-runs see zero change in cost,
+    # key set or zprobe timing, keeping a run comparable with the 74 historical
+    # ones reproducible.  Being a PretrainConfig field, its resolved value is
+    # saved with the run config, so "keys absent because the feature was off"
+    # stays distinguishable from "keys absent because the architecture has no
+    # usable latent" after the fact — the trajectory cannot be backfilled.
+    z_seq_metrics: bool = False
 
     # The normal path constructs an inert profiler; see perf_profiler.py.
     # PERF-001 candidate P1-A rollback switch. False keeps the registered
@@ -719,7 +746,7 @@ def launch(hydra_config: DictConfig):
         # science run's wandb config gains those two keys.  This touches an
         # artifact downstream figure code reads; see the 2026-07-28 ledger in
         # lab/reports/2026-07-26_experiment-speed-action-plan.md.
-        wandb.init(project=config.project_name, name=config.run_name, config=config.model_dump(), settings=wandb.Settings(_disable_stats=True))  # type: ignore
+        wandb.init(project=config.project_name, name=config.run_name, group=config.run_group, config=config.model_dump(), settings=wandb.Settings(_disable_stats=True))  # type: ignore
         wandb.log({"num_params": sum(x.numel() for x in train_state.model.parameters())}, step=0)
         save_code_and_config(config)
         if config.log_z_dynamics:
@@ -737,6 +764,7 @@ def launch(hydra_config: DictConfig):
                 phase_threshold=config.phase_threshold,
                 phase_patience=config.phase_patience,
                 checkpoint_path=_snap_path,
+                seq_metrics=config.z_seq_metrics,
             )
             if config.ema:
                 print("[z_logging] Probe will use EMA model copy for evaluation.")

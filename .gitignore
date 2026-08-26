@@ -10,9 +10,13 @@ logs/
 scripts/queue/
 
 lab/
-!lab/
-lab/*
-!lab/goal-graph-orchestration.md
+lab.pre-symlink-20260805/
+lab
+# lab is a symlink to /mnt/ayp/agents/trm — the dir pattern lab/ won't match a symlink
+lab.*
+
+# root-level md are working notes, not code — keep out of git (tracked README.md / goal-graph-orchestration.md unaffected)
+/*.md
 reports/
 research_mcp/
 scripts/

@@ -67,10 +67,25 @@ def load_dataset_metadata(data_path: str) -> dict:
         return json.load(f)
 
 
-def build_model_config(checkpoint_dir: str, batch_size: int = 1) -> dict:
+def build_model_config(
+    checkpoint_dir: str,
+    batch_size: int = 1,
+    h_cycles: int | None = None,
+    l_cycles: int | None = None,
+) -> dict:
     """
     Build the model config dict from all_config.yaml + dataset metadata.
     Mirrors pretrain.py:create_model() config assembly.
+
+    h_cycles / l_cycles override the recurrence counts recorded in all_config.yaml.
+    This is safe because the recurrent block is weight-tied: trm.py reads
+    H_cycles/L_cycles fresh on every forward() and loops over a single shared
+    L_level module, so no parameter or buffer shape depends on them and a
+    checkpoint loads at any cycle count under strict key matching.
+
+    Overriding makes the INFERENCE-TIME DEPTH AXIS measurable without retraining.
+    It does not imply accuracy is preserved at the new depth -- that is the open
+    question the override exists to measure, not an assumption it encodes.
     """
     all_cfg = load_all_config(checkpoint_dir)
     arch = all_cfg["arch"]
@@ -84,6 +99,15 @@ def build_model_config(checkpoint_dir: str, batch_size: int = 1) -> dict:
 
     # arch extras (all fields except 'name' and 'loss')
     arch_extras = {k: v for k, v in arch.items() if k not in ("name", "loss")}
+
+    # Depth-axis override. Applied after the trained values are read so the
+    # caller can report both. Weight tying is what makes this legal (see docstring).
+    for _name, _val in (("H_cycles", h_cycles), ("L_cycles", l_cycles)):
+        if _val is None:
+            continue
+        if not isinstance(_val, int) or _val < 1:
+            raise ValueError(f"{_name} override must be a positive int, got {_val!r}")
+        arch_extras[_name] = _val
 
     model_cfg = dict(
         **arch_extras,
@@ -1194,6 +1218,21 @@ if __name__ == "__main__":
     )
     # FIX 3 (a): operating-point AGOP via H_cycles-1 warmup. Default ON.
     parser.add_argument(
+        "--h-cycles", dest="h_cycles", type=int, default=None,
+        help=(
+            "Override H_cycles when rebuilding the model, instead of using the value\n"
+            "recorded in the checkpoint's all_config.yaml. Legal because the block is\n"
+            "weight-tied: no parameter shape depends on the cycle count, so the\n"
+            "checkpoint loads unchanged. This is what makes the inference-time depth\n"
+            "axis measurable without retraining. Whether ACCURACY survives the change\n"
+            "is the question being measured, not an assumption."
+        ),
+    )
+    parser.add_argument(
+        "--l-cycles", dest="l_cycles", type=int, default=None,
+        help="Override L_cycles when rebuilding the model. See --h-cycles.",
+    )
+    parser.add_argument(
         "--agop-warmup", dest="agop_warmup", action="store_true", default=True,
         help=(
             "FIX 3: run H_cycles-1 warmup under no_grad to reach the trained\n"
@@ -1236,10 +1275,30 @@ if __name__ == "__main__":
 
     try:
         all_config_yaml = load_all_config(config_source_dir)
-        config = build_model_config(config_source_dir)
+        config = build_model_config(
+            config_source_dir,
+            h_cycles=args.h_cycles,
+            l_cycles=args.l_cycles,
+        )
     except FileNotFoundError as e:
         print(f"[error] {e}")
         sys.exit(1)
+    except ValueError as e:
+        print(f"[error] {e}")
+        sys.exit(1)
+
+    # A depth-overridden run must never be mistaken for a native-depth measurement,
+    # so say so loudly on stdout next to the numbers it produces.
+    if args.h_cycles is not None or args.l_cycles is not None:
+        _trained = all_config_yaml.get("arch", {})
+        print(
+            "[depth-override] H_cycles {} -> {} | L_cycles {} -> {} | "
+            "checkpoint was TRAINED at the former; these outputs are an "
+            "inference-time depth-axis probe, not a native-depth measurement.".format(
+                _trained.get("H_cycles"), config.get("H_cycles"),
+                _trained.get("L_cycles"), config.get("L_cycles"),
+            )
+        )
 
     device = args.device
 

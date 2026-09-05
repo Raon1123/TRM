@@ -28,6 +28,20 @@ cd "$PROJ" || { echo "GATE-ERROR: no such project dir: $PROJ" >&2; exit 2; }
 export PATH="$HOME/.elan/bin:$PATH"
 command -v lake >/dev/null || { echo "GATE-ERROR: lake not on PATH" >&2; exit 2; }
 
+# Build from source FIRST. Without this the gate is worthless: `lake env lean`
+# happily elaborates against stale .olean artifacts, so a project whose source
+# file has been deleted or renamed still reports every theorem as axiom-clean.
+# That is exactly the failure that went unnoticed for a month when a migration
+# copy flattened SigmaK/Basic.lean -> sigmak__Basic.lean; `lake build` catches
+# it ("bad import"), `lake env lean` does not.
+build_out=$(lake build 2>&1)
+build_rc=$?
+if [ "$build_rc" -ne 0 ]; then
+  echo "GATE-ERROR: 'lake build' failed in $PROJ (exit $build_rc) — inconclusive, not a pass" >&2
+  printf '%s\n' "$build_out" >&2
+  exit 2
+fi
+
 out=$(lake env lean "$CHECK" 2>&1)
 rc=$?
 if [ "$rc" -ne 0 ]; then
